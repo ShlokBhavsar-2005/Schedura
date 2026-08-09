@@ -303,10 +303,10 @@
       if (res.ok && data.success) {
         sessionStorage.setItem('auth_token', data.token);
         sessionStorage.setItem('auth_email', data.email);
-        showAlert('✅ Login successful! Redirecting…', 'success');
+        showAlert(' Login successful! Redirecting…', 'success');
         setTimeout(() => { window.location.href = 'dashboard.html'; }, 800);
       } else {
-        showAlert('❌ ' + (data.error || 'Invalid email or password.'), 'error');
+        showAlert(' ' + (data.error || 'Invalid email or password.'), 'error');
         btn.disabled = false;
         spinner.style.display = 'none';
       }

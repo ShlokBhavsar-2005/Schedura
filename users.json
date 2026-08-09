@@ -10,5 +10,11 @@
     "passwordHash": "$2a$10$.HaopUiqT.gbl9GWRcq/DOarY1rf/lcfntv5Pse.DhYqZK1kulX8C",
     "name": "faculty",
     "role": "user"
+  },
+  {
+    "email": "test@diu.iiitvadodara.ac.in",
+    "passwordHash": "$2a$10$tf1v6z4CAEnAYg2N3KVUD.HmaT/MvdGMGZRW5cVa6zPtwDqKXoVpK",
+    "name": "test",
+    "role": "user"
   }
 ]
