@@ -233,7 +233,7 @@ app.put('/api/projects/:id', requireAuth, (req, res) => {
   if (body.standards && Array.isArray(body.standards)) {
     const stdIds = body.standards.map(s => s.id).filter(Boolean);
     const dupStd = stdIds.find((id, i) => stdIds.indexOf(id) !== i);
-    if (dupStd) return res.status(400).json({ success: false, error: `Duplicate group ID "${dupStd}".` });
+    if (dupStd) return res.status(400).json({ success: false, error: `Duplicate standard ID "${dupStd}".` });
 
     const allCourseIds   = body.standards.flatMap(s => (s.courses||[]).map(c => c.id)).filter(Boolean);
     const allCourseCodes = body.standards.flatMap(s => (s.courses||[]).map(c => (c.courseCode||'').trim().toUpperCase())).filter(Boolean);
@@ -396,7 +396,7 @@ function validateInput(data) {
   const errors = [];
 
   // ── Presence checks ──────────────────────────────────────────────────
-  if (!data.standards   || data.standards.length   === 0) errors.push('At least one group is required');
+  if (!data.standards   || data.standards.length   === 0) errors.push('At least one standard is required');
   if (!data.faculty     || data.faculty.length     === 0) errors.push('At least one faculty member is required');
   if (!data.assignments || data.assignments.length === 0) errors.push('At least one course assignment is required');
   if (!data.classrooms  || data.classrooms.length  === 0) errors.push('At least one classroom is required');
@@ -441,7 +441,7 @@ function validateInput(data) {
   const courseIds     = [];
   const courseCodes   = [];
   (data.standards || []).forEach((s, si) => {
-    const sLabel = `Group ${si + 1}`;
+    const sLabel = `Standard ${si + 1}`;
     if (!s.id || !s.id.trim())
       errors.push(`${sLabel}: Missing ID`);
     if (!s.name || !s.name.trim())
@@ -451,18 +451,18 @@ function validateInput(data) {
 
     if (s.id) {
       if (standardIds.includes(s.id))
-        errors.push(`Duplicate group ID "${s.id}"`);
+        errors.push(`Duplicate standard ID "${s.id}"`);
       else standardIds.push(s.id);
     }
     if (s.name) {
       const name = s.name.trim().toLowerCase();
       if (standardNames.includes(name))
-        errors.push(`Duplicate group name "${s.name}"`);
+        errors.push(`Duplicate standard name "${s.name}"`);
       else standardNames.push(name);
     }
 
     (s.courses || []).forEach((c, ci) => {
-      const cLabel = `Group "${s.name || si + 1}" → Course ${ci + 1}`;
+      const cLabel = `Standard "${s.name || si + 1}" → Course ${ci + 1}`;
       if (!c.id || !c.id.trim())
         errors.push(`${cLabel}: Missing ID`);
       if (!c.name || !c.name.trim())
@@ -478,7 +478,7 @@ function validateInput(data) {
       if (c.courseCode) {
         const code = c.courseCode.trim().toUpperCase();
         if (courseCodes.includes(code))
-          errors.push(`Duplicate course code "${c.courseCode}" — course codes must be unique across all groups`);
+          errors.push(`Duplicate course code "${c.courseCode}" — course codes must be unique across all standards`);
         else courseCodes.push(code);
       }
     });
@@ -630,9 +630,9 @@ function checkFeasibility(data) {
       });
       if (needed > maxSlotsPerStandard) {
         reasons.push(
-          `Group "${std.name}" needs ${needed} class slots but only ${maxSlotsPerStandard} exist ` +
+          `Standard "${std.name}" needs ${needed} class slots but only ${maxSlotsPerStandard} exist ` +
           `(${daysOfWeek.length} days × ${timeSlots.length} slots). ` +
-          `A group can only attend one class per time slot. Add more days or time slots.`
+          `A standard can only attend one class per time slot. Add more days or time slots.`
         );
       }
     });
@@ -709,7 +709,7 @@ const XL = {
   headerText: 'FF1F232B',
   emptyFill:  'FFFFFFFF',
   border:     'FFD8D2C6',
-  // Subtle tints cycled per group row so adjacent groups stay distinguishable
+  // Subtle tints cycled per standard row so adjacent standards stay distinguishable
   groupFills: ['FFECF1F7', 'FFEFF4EC', 'FFFAF3E8', 'FFF2EFF6']
 };
 
@@ -744,7 +744,7 @@ async function createExcelTimetable(schedule, filepath) {
   worksheet.getRow(1).height = 24;
 
   worksheet.getCell('A2').value = 'Day';
-  worksheet.getCell('B2').value = 'Group';
+  worksheet.getCell('B2').value = 'Standard';
   worksheet.getCell('C2').value = 'Classes';
   timeSlots.forEach((time, idx) => {
     const col = excelColName(3 + idx); // D, E, F, ...

@@ -592,12 +592,12 @@
       <p>Automated conflict-free schedule planning</p>
     </div>
 
-    <!-- Groups Section -->
+    <!-- Standards Section -->
     <div class="section">
-      <div class="section-title">Class Groups &amp; Courses</div>
-      <p class="section-subtitle">Add each group of students and the courses it needs to attend.</p>
+      <div class="section-title">Standards &amp; Courses</div>
+      <p class="section-subtitle">Add each standard and the courses it needs to attend.</p>
       <div id="standardsContainer"></div>
-      <button class="btn-add" onclick="addStandard()">+ Add group</button>
+      <button class="btn-add" onclick="addStandard()">+ Add standard</button>
     </div>
 
     <!-- Faculty Section -->
@@ -710,13 +710,13 @@
 
       <div class="output-block">
         <h3>Master schedule</h3>
-        <p class="hint">Every scheduled class across all groups and days.</p>
+        <p class="hint">Every scheduled class across all standards and days.</p>
         <div id="previewContainer"></div>
       </div>
 
       <div class="output-block">
-        <h3>Group timetables</h3>
-        <p class="hint">A week view for each class group, with export options.</p>
+        <h3>Standard timetables</h3>
+        <p class="hint">A week view for each standard, with export options.</p>
         <div id="standardTimetablesContainer"></div>
       </div>
 
@@ -901,8 +901,8 @@
       cardDiv.id = standardId;
       cardDiv.innerHTML = `
         <div>
-          <label>Group name</label>
-          <input type="text" placeholder="e.g. Group A" onchange="updateStandardName('${standardId}', this.value)">
+          <label>Standard name</label>
+          <input type="text" placeholder="e.g. 8-A" onchange="updateStandardName('${standardId}', this.value)">
         </div>
 
         <div style="margin-top: 15px;">
@@ -911,7 +911,7 @@
           <button class="btn-add" style="margin-top: 10px;" onclick="addCourse('${standardId}')">+ Add course</button>
         </div>
 
-        <button class="btn-remove" onclick="removeStandard('${standardId}')">Remove group</button>
+        <button class="btn-remove" onclick="removeStandard('${standardId}')">Remove standard</button>
       `;
       container.appendChild(cardDiv);
     }
@@ -988,7 +988,7 @@
     function removeStandard(standardId) {
       const standardIndex = standards.findIndex(s => s.id === standardId);
       if (standardIndex === -1) return;
-      if (confirm('Remove this group and all its courses?')) {
+      if (confirm('Remove this standard and all its courses?')) {
         document.getElementById(standardId).remove();
         standards.splice(standardIndex, 1);
         updateAssignmentDropdowns();
@@ -1409,7 +1409,7 @@
               <option value="">Select a faculty member</option>${facultyOptionsHtml(c.facultyId)}
             </select></div>`;
       } else if (c.type === 'no_back_to_back_course') {
-        fieldsHtml = `<div style="font-size:12px;color:var(--muted);padding-top:20px;">Applies to all courses and groups — penalises any course taught to the same group in consecutive time slots on the same day.</div>`;
+        fieldsHtml = `<div style="font-size:12px;color:var(--muted);padding-top:20px;">Applies to all courses and standards — penalises any course taught to the same standard in consecutive time slots on the same day.</div>`;
       } else if (c.type === 'balanced_daily_load') {
         fieldsHtml = `<div style="font-size:12px;color:var(--muted);padding-top:20px;">Applies to all faculty — penalises uneven load distribution across the week.</div>`;
       } else if (c.type === 'course_preferred_slot') {
@@ -1432,7 +1432,7 @@
           <select style="flex:1;min-width:220px;" onchange="updateSCType('${cid}',this.value)">
             <option value="faculty_prefers_first_half"  ${c.type==='faculty_prefers_first_half'?'selected':''}>Faculty Prefers First Half</option>
             <option value="faculty_prefers_second_half" ${c.type==='faculty_prefers_second_half'?'selected':''}>Faculty Prefers Second Half</option>
-            <option value="no_back_to_back_course"      ${c.type==='no_back_to_back_course'?'selected':''}>No back-to-back same course (same group)</option>
+            <option value="no_back_to_back_course"      ${c.type==='no_back_to_back_course'?'selected':''}>No back-to-back same course (same standard)</option>
             <option value="balanced_daily_load"         ${c.type==='balanced_daily_load'?'selected':''}>Balanced Daily Load for Faculty</option>
             <option value="course_preferred_slot"       ${c.type==='course_preferred_slot'?'selected':''}>Course Preferred Timeslot</option>
           </select>
@@ -1492,7 +1492,7 @@
 
     function createPreviewTable(schedule) {
       const container = document.getElementById('previewContainer');
-      let html = '<div class="table-wrapper"><table><thead><tr><th>Day</th><th>Group</th><th>Course</th><th>Faculty</th><th>Classroom</th><th>Time</th></tr></thead><tbody>';
+      let html = '<div class="table-wrapper"><table><thead><tr><th>Day</th><th>Standard</th><th>Course</th><th>Faculty</th><th>Classroom</th><th>Time</th></tr></thead><tbody>';
 
       Object.entries(schedule).forEach(([day, classes]) => {
         classes.forEach((cls, idx) => {
@@ -1539,7 +1539,7 @@
         </div>`;
       });
 
-      container.innerHTML = html || '<p style="color:var(--muted);font-size:13px;">No groups found.</p>';
+      container.innerHTML = html || '<p style="color:var(--muted);font-size:13px;">No standards found.</p>';
     }
 
     function createStandardTable(standard, standardLabel) {
@@ -1868,7 +1868,7 @@
       if (genBtn && genBtn.disabled) return; // already generating — ignore extra clicks
 
       if (standards.length === 0 || standards.some(s => s.courses.length === 0)) {
-        showAlert('Please add at least one group with courses', 'error'); return;
+        showAlert('Please add at least one standard with courses', 'error'); return;
       }
       if (faculty.length === 0) { showAlert('Please add at least one faculty member', 'error'); return; }
       if (assignments.length === 0) { showAlert('Please add at least one course assignment', 'error'); return; }
@@ -2160,15 +2160,15 @@
           card.className = 'card'; card.id = std.id;
           card.innerHTML = `
             <div>
-              <label>Group name</label>
-              <input type="text" value="${esc(std.name)}" placeholder="e.g. Group A" onchange="updateStandardName('${std.id}', this.value)">
+              <label>Standard name</label>
+              <input type="text" value="${esc(std.name)}" placeholder="e.g. 8-A" onchange="updateStandardName('${std.id}', this.value)">
             </div>
             <div style="margin-top:15px;">
               <p style="margin:0 0 8px 0;font-weight:600;font-size:13px;color:var(--text);">Courses</p>
               <div id="${std.id}-courses"></div>
               <button class="btn-add" style="margin-top:10px;" onclick="addCourse('${std.id}')">+ Add course</button>
             </div>
-            <button class="btn-remove" onclick="removeStandard('${std.id}')">Remove group</button>`;
+            <button class="btn-remove" onclick="removeStandard('${std.id}')">Remove standard</button>`;
           container.appendChild(card);
 
           (std.courses||[]).forEach(course => {

@@ -59,7 +59,7 @@ timetabletest/
 **Data Models**:
 - **Users**: Not stored locally — identity is the verified email from the Google ID token
 - **Projects**: Per-user JSON files containing:
-  - Groups (classes) with courses
+  - Standards (classes) with courses
   - Faculty members
   - Course assignments (course ↔ faculty mappings)
   - Classrooms, time slots, days
@@ -80,7 +80,7 @@ timetabletest/
 - **Hard Constraints** (must be satisfied):
   - No faculty double-booking
   - No classroom double-booking
-  - No group (class) double-booking per time slot
+  - No standard (class) double-booking per time slot
   - Faculty unavailability
   - Faculty first/second half restrictions
   - Room restrictions for specific courses
@@ -188,7 +188,7 @@ timetabletest/
 - Constraint-aware initialization and repair
 
 ### public/index.html (Main Interface)
-- Form for defining groups, courses, faculty, assignments
+- Form for defining standards, courses, faculty, assignments
 - Constraint configuration
 - AJAX submission to generate timetable
 - Results display with download link
