@@ -1,8 +1,8 @@
-# Timetable Generator Codebase Explanation
+# Schedura Codebase Explanation
 
 ## Project Overview
 
-This is an **Intelligent Timetable Generator** web application that uses a **Genetic Algorithm (GA)** to create optimized school timetables. The system ensures that all hard constraints (e.g., no double-booking of faculty or classrooms) are satisfied while maximizing soft constraints (e.g., preferred time slots).
+This is **Schedura**, a timetable generation web application that uses a **Genetic Algorithm (GA)** to create optimized school timetables. The system ensures that all hard constraints (e.g., no double-booking of faculty or classrooms) are satisfied while maximizing soft constraints (e.g., preferred time slots).
 
 Key features:
 - Sign in with any Google account (Google Identity Services)
@@ -59,7 +59,7 @@ timetabletest/
 **Data Models**:
 - **Users**: Not stored locally — identity is the verified email from the Google ID token
 - **Projects**: Per-user JSON files containing:
-  - Standards (classes) with courses
+  - Groups (classes) with courses
   - Faculty members
   - Course assignments (course ↔ faculty mappings)
   - Classrooms, time slots, days
@@ -80,7 +80,7 @@ timetabletest/
 - **Hard Constraints** (must be satisfied):
   - No faculty double-booking
   - No classroom double-booking
-  - No standard (class) double-booking per timeslot
+  - No group (class) double-booking per time slot
   - Faculty unavailability
   - Faculty first/second half restrictions
   - Room restrictions for specific courses
@@ -105,7 +105,7 @@ timetabletest/
 - **index.html**: Main timetable builder interface
 
 **Features**:
-- Dark theme with IBM Plex fonts
+- Light "cream paper" theme with IBM Plex fonts
 - Responsive design
 - Client-side form validation
 - AJAX calls to backend APIs
@@ -188,7 +188,7 @@ timetabletest/
 - Constraint-aware initialization and repair
 
 ### public/index.html (Main Interface)
-- Form for defining standards, courses, faculty, assignments
+- Form for defining groups, courses, faculty, assignments
 - Constraint configuration
 - AJAX submission to generate timetable
 - Results display with download link

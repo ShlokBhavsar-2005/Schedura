@@ -2,76 +2,96 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Login – Timetable Generator</title>
+  <title>Sign in · Schedura</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@500;600&display=swap" rel="stylesheet"/>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'IBM Plex Sans', sans-serif; }
+    :root {
+      --bg:             #F5F2EB;
+      --surface:        #FFFFFF;
+      --surface-alt:    #FBF9F4;
+      --border:         #E0DACE;
+      --border-strong:  #C8C0AF;
+      --text:           #1F232B;
+      --text-secondary: #4A4F59;
+      --muted:          #7C776E;
+      --accent:         #2C4A70;
+      --danger:         #A32B22;
+      --danger-soft:    #FAEDEC;
+      --danger-border:  #E6C5C2;
+      --success:        #2A6B47;
+      --success-soft:   #EBF3EE;
+      --success-border: #BFD9CB;
+      --radius:         6px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       min-height: 100vh;
-      background: #0f1117;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'IBM Plex Sans', system-ui, sans-serif;
       display: flex;
       align-items: center;
       justify-content: center;
+      padding: 24px;
+      -webkit-font-smoothing: antialiased;
     }
 
-    .login-wrapper {
-      width: 100%;
-      max-width: 420px;
-      padding: 20px;
+    .login-wrapper { width: 100%; max-width: 400px; }
+
+    .brand { text-align: center; margin-bottom: 32px; }
+
+    .brand h1 {
+      font-family: 'IBM Plex Serif', Georgia, serif;
+      font-size: 32px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      color: var(--text);
     }
 
-    .logo-area {
-      text-align: center;
-      margin-bottom: 30px;
+    .brand .rule {
+      width: 36px;
+      height: 2px;
+      background: var(--accent);
+      margin: 14px auto 12px;
     }
 
-    .logo-area .icon {
-      font-size: 48px;
-      display: block;
-      margin-bottom: 12px;
+    .brand p {
+      color: var(--muted);
+      font-size: 13.5px;
+      line-height: 1.5;
     }
 
-    .logo-area h1 {
-      font-size: 24px;
-      color: #e2e8f0;
-      font-weight: 700;
-      font-family: 'IBM Plex Mono', monospace;
-    }
-
-    .logo-area p {
-      color: #64748b;
-      font-size: 14px;
-      margin-top: 6px;
-    }
-
-    .login-card {
-      background: #1a1d27;
-      border: 1px solid #2e3250;
-      border-radius: 14px;
-      padding: 36px 32px;
-      box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 32px 28px;
+      box-shadow: 0 1px 3px rgba(31,35,43,0.05);
       text-align: center;
     }
 
-    .login-card h2 {
-      font-size: 20px;
-      color: #e2e8f0;
+    .card h2 {
+      font-size: 16px;
+      font-weight: 600;
       margin-bottom: 6px;
     }
 
-    .login-card .subtitle {
+    .card .subtitle {
       font-size: 13px;
-      color: #64748b;
-      margin-bottom: 28px;
+      color: var(--muted);
+      margin-bottom: 26px;
+      line-height: 1.5;
     }
 
     .alert {
-      padding: 12px 14px;
-      border-radius: 7px;
-      font-size: 13.5px;
+      padding: 11px 13px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      line-height: 1.5;
       margin-bottom: 20px;
       display: none;
       text-align: left;
@@ -79,20 +99,20 @@
 
     .alert.show { display: block; }
 
-    .alert-error   { background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
-    .alert-success { background: rgba(34,197,94,0.15); color: #86efac; border: 1px solid rgba(34,197,94,0.3); }
+    .alert-error   { background: var(--danger-soft);  color: var(--danger);  border: 1px solid var(--danger-border); }
+    .alert-success { background: var(--success-soft); color: var(--success); border: 1px solid var(--success-border); }
 
     #googleBtnContainer {
       display: flex;
       justify-content: center;
       min-height: 44px;
+      align-items: center;
     }
 
     .spinner {
-      display: inline-block;
-      width: 22px; height: 22px;
-      border: 2px solid rgba(255,255,255,0.15);
-      border-top-color: #4f6ef7;
+      width: 20px; height: 20px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
       border-radius: 50%;
       animation: spin 0.7s linear infinite;
     }
@@ -102,28 +122,31 @@
     footer {
       text-align: center;
       font-size: 12px;
-      color: #475569;
-      margin-top: 20px;
+      color: var(--muted);
+      margin-top: 24px;
+      line-height: 1.6;
     }
   </style>
 </head>
 <body>
 
 <div class="login-wrapper">
-  <div class="logo-area">
-    <span class="icon">📚</span>
-    <h1>Timetable Generator</h1>
-    <p>Conflict-free scheduling with Genetic Algorithms</p>
+  <div class="brand">
+    <h1>Schedura</h1>
+    <div class="rule"></div>
+    <p>Automated conflict-free schedule planning</p>
   </div>
 
-  <div class="login-card">
-    <h2>Welcome</h2>
-    <p class="subtitle">Sign in with Google to access your projects</p>
+  <div class="card">
+    <h2>Sign in</h2>
+    <p class="subtitle">Use your Google account to access your projects.</p>
 
     <div id="alertBox" class="alert"></div>
 
     <div id="googleBtnContainer"><div class="spinner"></div></div>
   </div>
+
+  <footer>Your projects are private to your account.</footer>
 </div>
 
 <script>
@@ -157,13 +180,13 @@
       if (res.ok && data.success) {
         sessionStorage.setItem('auth_token', data.token);
         sessionStorage.setItem('auth_email', data.email);
-        showAlert('Login successful! Redirecting…', 'success');
+        showAlert('Signed in. Redirecting…', 'success');
         setTimeout(() => { window.location.href = 'dashboard.html'; }, 500);
       } else {
         showAlert(data.error || 'Google sign-in failed.', 'error');
       }
     } catch (err) {
-      showAlert('⚠️ Cannot reach the server. Make sure the backend is running.', 'error');
+      showAlert('Cannot reach the server. Make sure the backend is running.', 'error');
     }
   }
 
@@ -211,14 +234,15 @@
 
       container.innerHTML = '';
       google.accounts.id.renderButton(container, {
-        theme: 'filled_blue',
+        theme: 'outline',
         size: 'large',
         width: 300,
-        text: 'signin_with'
+        text: 'signin_with',
+        shape: 'rectangular'
       });
     } catch (err) {
       container.innerHTML = '';
-      showAlert('⚠️ Cannot reach the server. Make sure the backend is running.', 'error');
+      showAlert('Cannot reach the server. Make sure the backend is running.', 'error');
     }
   }
 

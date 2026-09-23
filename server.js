@@ -233,7 +233,7 @@ app.put('/api/projects/:id', requireAuth, (req, res) => {
   if (body.standards && Array.isArray(body.standards)) {
     const stdIds = body.standards.map(s => s.id).filter(Boolean);
     const dupStd = stdIds.find((id, i) => stdIds.indexOf(id) !== i);
-    if (dupStd) return res.status(400).json({ success: false, error: `Duplicate standard ID "${dupStd}".` });
+    if (dupStd) return res.status(400).json({ success: false, error: `Duplicate group ID "${dupStd}".` });
 
     const allCourseIds   = body.standards.flatMap(s => (s.courses||[]).map(c => c.id)).filter(Boolean);
     const allCourseCodes = body.standards.flatMap(s => (s.courses||[]).map(c => (c.courseCode||'').trim().toUpperCase())).filter(Boolean);
@@ -396,7 +396,7 @@ function validateInput(data) {
   const errors = [];
 
   // ── Presence checks ──────────────────────────────────────────────────
-  if (!data.standards   || data.standards.length   === 0) errors.push('At least one standard is required');
+  if (!data.standards   || data.standards.length   === 0) errors.push('At least one group is required');
   if (!data.faculty     || data.faculty.length     === 0) errors.push('At least one faculty member is required');
   if (!data.assignments || data.assignments.length === 0) errors.push('At least one course assignment is required');
   if (!data.classrooms  || data.classrooms.length  === 0) errors.push('At least one classroom is required');
@@ -441,7 +441,7 @@ function validateInput(data) {
   const courseIds     = [];
   const courseCodes   = [];
   (data.standards || []).forEach((s, si) => {
-    const sLabel = `Standard ${si + 1}`;
+    const sLabel = `Group ${si + 1}`;
     if (!s.id || !s.id.trim())
       errors.push(`${sLabel}: Missing ID`);
     if (!s.name || !s.name.trim())
@@ -451,18 +451,18 @@ function validateInput(data) {
 
     if (s.id) {
       if (standardIds.includes(s.id))
-        errors.push(`Duplicate standard ID "${s.id}"`);
+        errors.push(`Duplicate group ID "${s.id}"`);
       else standardIds.push(s.id);
     }
     if (s.name) {
       const name = s.name.trim().toLowerCase();
       if (standardNames.includes(name))
-        errors.push(`Duplicate standard name "${s.name}"`);
+        errors.push(`Duplicate group name "${s.name}"`);
       else standardNames.push(name);
     }
 
     (s.courses || []).forEach((c, ci) => {
-      const cLabel = `Standard "${s.name || si + 1}" → Course ${ci + 1}`;
+      const cLabel = `Group "${s.name || si + 1}" → Course ${ci + 1}`;
       if (!c.id || !c.id.trim())
         errors.push(`${cLabel}: Missing ID`);
       if (!c.name || !c.name.trim())
@@ -478,7 +478,7 @@ function validateInput(data) {
       if (c.courseCode) {
         const code = c.courseCode.trim().toUpperCase();
         if (courseCodes.includes(code))
-          errors.push(`Duplicate course code "${c.courseCode}" — course codes must be unique across all standards`);
+          errors.push(`Duplicate course code "${c.courseCode}" — course codes must be unique across all groups`);
         else courseCodes.push(code);
       }
     });
@@ -630,9 +630,9 @@ function checkFeasibility(data) {
       });
       if (needed > maxSlotsPerStandard) {
         reasons.push(
-          `Standard "${std.name}" needs ${needed} class slots but only ${maxSlotsPerStandard} exist ` +
+          `Group "${std.name}" needs ${needed} class slots but only ${maxSlotsPerStandard} exist ` +
           `(${daysOfWeek.length} days × ${timeSlots.length} slots). ` +
-          `A standard can only attend one class per timeslot. Add more days or time slots.`
+          `A group can only attend one class per time slot. Add more days or time slots.`
         );
       }
     });
@@ -703,9 +703,22 @@ function excelColName(idx) {
   return name;
 }
 
+// Workbook palette — mirrors the app's light "cream paper" theme.
+const XL = {
+  headerFill: 'FFF0ECE2',  // sunken cream
+  headerText: 'FF1F232B',
+  emptyFill:  'FFFFFFFF',
+  border:     'FFD8D2C6',
+  // Subtle tints cycled per group row so adjacent groups stay distinguishable
+  groupFills: ['FFECF1F7', 'FFEFF4EC', 'FFFAF3E8', 'FFF2EFF6']
+};
+
 async function createExcelTimetable(schedule, filepath) {
   const workbook  = new ExcelJS.Workbook();
-  const worksheet = workbook.addWorksheet('Timetable');
+  const worksheet = workbook.addWorksheet('Schedule');
+
+  const edge       = { style: 'thin', color: { argb: XL.border } };
+  const cellBorder = { top: edge, left: edge, bottom: edge, right: edge };
 
   const days = Object.keys(schedule);
   const allTimeSlots = new Set();
@@ -725,14 +738,14 @@ async function createExcelTimetable(schedule, filepath) {
   const lastColName = excelColName(2 + timeSlots.length); // 0-based: col 0=A, col 1=B, col 2=C, col 3=D...
   worksheet.mergeCells(`A1:${lastColName}1`);
   const infoCell = worksheet.getCell('A1');
-  infoCell.value = 'Time mentioned is corresponding to the left cell boundary. Each cell is of 15 minutes duration.';
-  infoCell.font  = { size: 10, italic: true };
-  infoCell.alignment = { horizontal: 'center', vertical: 'top', wrapText: true };
-  worksheet.getRow(1).height = 30;
+  infoCell.value = 'Each time column is labelled with the start time of that slot.';
+  infoCell.font  = { size: 10, italic: true, color: { argb: 'FF7C776E' } };
+  infoCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  worksheet.getRow(1).height = 24;
 
   worksheet.getCell('A2').value = 'Day';
-  worksheet.getCell('B2').value = 'Class/Standard';
-  worksheet.getCell('C2').value = 'Cap #';
+  worksheet.getCell('B2').value = 'Group';
+  worksheet.getCell('C2').value = 'Classes';
   timeSlots.forEach((time, idx) => {
     const col = excelColName(3 + idx); // D, E, F, ...
     worksheet.getCell(`${col}2`).value = time;
@@ -742,14 +755,13 @@ async function createExcelTimetable(schedule, filepath) {
   const totalCols = 3 + timeSlots.length; // A, B, C + time slots
   for (let ci = 0; ci < totalCols; ci++) {
     const cell = worksheet.getCell(`${excelColName(ci)}2`);
-    cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE8E8E8' } };
-    cell.font  = { bold: true };
-    cell.alignment = { horizontal: 'center', vertical: 'center' };
-    cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+    cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL.headerFill } };
+    cell.font  = { bold: true, color: { argb: XL.headerText } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' };
+    cell.border = cellBorder;
   }
 
   let currentRow = 3;
-  const colors   = ['FFFCE4d6', 'FFDDEBF7', 'FFe2efda', 'FFfce4d6'];
   let colorIdx   = 0;
 
   days.forEach(day => {
@@ -764,14 +776,20 @@ async function createExcelTimetable(schedule, filepath) {
         const dayCell = worksheet.getCell(`A${currentRow}`);
         dayCell.value = day;
         dayCell.font  = { bold: true, size: 11 };
-        dayCell.alignment = { horizontal: 'center', vertical: 'top' };
+        dayCell.alignment = { horizontal: 'center', vertical: 'middle' };
         worksheet.mergeCells(`A${currentRow}:A${currentRow + standards.length - 1}`);
       }
+      worksheet.getCell(`A${currentRow}`).border = cellBorder;
 
-      worksheet.getCell(`B${currentRow}`).value = standard;
-      worksheet.getCell(`B${currentRow}`).alignment = { horizontal: 'left', vertical: 'top', wrapText: true };
-      worksheet.getCell(`C${currentRow}`).value = stdClasses.length;
-      worksheet.getCell(`C${currentRow}`).alignment = { horizontal: 'center', vertical: 'top' };
+      const groupCell = worksheet.getCell(`B${currentRow}`);
+      groupCell.value = standard;
+      groupCell.alignment = { horizontal: 'left', vertical: 'top', wrapText: true };
+      groupCell.border = cellBorder;
+
+      const countCell = worksheet.getCell(`C${currentRow}`);
+      countCell.value = stdClasses.length;
+      countCell.alignment = { horizontal: 'center', vertical: 'top' };
+      countCell.border = cellBorder;
 
       timeSlots.forEach((time, timeIdx) => {
         const col  = excelColName(3 + timeIdx);
@@ -780,12 +798,12 @@ async function createExcelTimetable(schedule, filepath) {
         if (classesAtTime.length > 0) {
           const cls  = classesAtTime[0];
           cell.value = `${cls.course} (${cls.faculty})\n${cls.classroom}`;
-          cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: colors[colorIdx % colors.length] } };
+          cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL.groupFills[colorIdx % XL.groupFills.length] } };
         } else {
-          cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+          cell.fill  = { type: 'pattern', pattern: 'solid', fgColor: { argb: XL.emptyFill } };
         }
         cell.alignment = { horizontal: 'center', vertical: 'top', wrapText: true };
-        cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+        cell.border = cellBorder;
       });
 
       worksheet.getRow(currentRow).height = rowHeight;

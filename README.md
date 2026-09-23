@@ -1,4 +1,4 @@
-# Timetable Generator
+# Schedura
 
 An intelligent academic timetable scheduling system built with Node.js and a custom Genetic Algorithm. It generates conflict-free timetables for multiple student groups while respecting faculty availability, classroom constraints, and institutional scheduling preferences.
 
@@ -48,7 +48,7 @@ The application is a full-stack web app. Users sign in with their Google account
 
 ```bash
 git clone <repository-url>
-cd timetable-generator
+cd schedura
 npm install
 ```
 
