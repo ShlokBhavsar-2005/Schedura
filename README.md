@@ -8,13 +8,13 @@ An intelligent academic timetable scheduling system built with Node.js and a cus
 
 Manually building timetables for an institution is a time-consuming and error-prone process, especially when dealing with overlapping faculty assignments, limited classrooms, and varying course loads. This system automates that process by modeling the scheduling problem as an optimization task and solving it using a Genetic Algorithm that evolves solutions until all hard conflicts are eliminated.
 
-The application is a full-stack web app. Faculty or administrators log in, define their courses, faculty, classrooms, and constraints through a browser-based UI, and the backend handles the rest — from validation to schedule generation to exporting a formatted Excel file.
+The application is a full-stack web app. Users sign in with their Google account, define their courses, faculty, classrooms, and constraints through a browser-based UI, and the backend handles the rest — from validation to schedule generation to exporting a formatted Excel file.
 
 ---
 
 ## Features
 
-- Multi-user support with JWT-based authentication
+- Sign in with any Google account (Google Identity Services + JWT session)
 - Project-based data management (each user manages their own scheduling projects)
 - Configurable hard and soft constraints
 - Genetic Algorithm with adaptive mutation and conflict repair
@@ -30,7 +30,7 @@ The application is a full-stack web app. Faculty or administrators log in, defin
 |---|---|
 | Backend | Node.js, Express |
 | Algorithm | Custom Genetic Algorithm (`ga.js`) |
-| Auth | JWT (`jsonwebtoken`), password hashing (`bcryptjs`) |
+| Auth | Google Sign-In (`google-auth-library`), session JWT (`jsonwebtoken`) |
 | Export | ExcelJS |
 | Frontend | Vanilla HTML, CSS, JavaScript |
 | Storage | JSON files |
@@ -52,25 +52,32 @@ cd timetable-generator
 npm install
 ```
 
+### Google Sign-In Setup
+
+This app authenticates users with Google Sign-In (Google Identity Services), so you need an OAuth 2.0 Client ID:
+
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services → Credentials**.
+2. Create an **OAuth client ID** of type **Web application**.
+3. Under **Authorized JavaScript origins**, add the URL(s) you'll serve the app from (e.g. `http://localhost:5000` for local dev, plus your production URL).
+4. Copy the generated **Client ID** and set it as an environment variable before starting the server:
+
+```bash
+set GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com   # Windows (cmd)
+$env:GOOGLE_CLIENT_ID="your-client-id.apps.googleusercontent.com" # Windows (PowerShell)
+export GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com # macOS/Linux
+```
+
+Also set `JWT_SECRET` to a strong random value in production (it defaults to a placeholder that must not be used outside local dev).
+
+No user registration step is needed — any Google account can sign in, and a project workspace is created for that account automatically on first login.
+
 ### Running the Server
 
 ```bash
 npm start
 ```
 
-The server will start on `http://localhost:3000` by default.
-
----
-
-## User Management
-
-Users are not registered through the UI. They are added directly via the `adduser.js` script. Emails must belong to the institutional domain (`@diu.iiitvadodara.ac.in`).
-
-```bash
-node adduser.js admin@diu.iiitvadodara.ac.in YourPassword123
-```
-
-This hashes the password with bcrypt and appends the user entry to `users.json`. You can run this script multiple times to add more users.
+The server will start on `http://localhost:5000` by default.
 
 ---
 
@@ -80,7 +87,7 @@ When a user submits their configuration and clicks "Generate Timetable", the bac
 
 1. **Input Validation** — Checks for duplicate IDs, empty fields, and malformed data structures.
 2. **Feasibility Check** — Verifies mathematically that enough time slots exist for all required sessions. If not, it fails immediately with a clear message rather than running the algorithm indefinitely.
-3. **Genetic Algorithm** — Evolves a population of candidate schedules. Each individual is scored by a fitness function that applies heavy penalties for hard constraint violations (faculty clashes, room double-bookings, student group conflicts) and lighter penalties for soft constraint violations. The algorithm runs until it produces a schedule with zero hard conflicts, or exits after a 25-second safety timeout.
+3. **Genetic Algorithm** — Evolves a population of candidate schedules. Each individual is scored by a fitness function that applies heavy penalties for hard constraint violations (faculty clashes, room double-bookings, student group conflicts) and lighter penalties for soft constraint violations. The algorithm restarts with a fresh population whenever it stagnates and never returns until it produces a schedule with zero hard conflicts — there is no time limit, so the feasibility check in step 2 is what keeps a request from running forever.
 4. **Solution Formatting** — Converts the raw integer indices from the chromosome representation back into human-readable days, times, course names, and faculty.
 5. **Excel Export** — Writes the final timetable to a formatted `.xlsx` file, which is made available for download.
 
@@ -110,8 +117,6 @@ Constraints are defined by the user through the UI and sent to the backend as pa
 .
 ├── server.js          # Express server, API routes, validation, Excel export
 ├── ga.js              # Genetic Algorithm implementation
-├── adduser.js         # CLI script to register new users
-├── users.json         # Stores hashed user credentials
 ├── package.json
 ├── public/
 │   ├── login.html     # Login page
@@ -125,9 +130,9 @@ Constraints are defined by the user through the UI and sent to the backend as pa
 
 ## Debugging Notes
 
-- **Generation hangs or times out**: The GA has a hard 25-second limit. If it consistently times out, the feasibility checker likely has a gap — the configuration may be mathematically impossible to schedule even though the pre-check passed.
+- **Generation hangs**: The GA has no time limit and will restart indefinitely until it finds a zero-conflict schedule. If a request hangs for a long time, the feasibility checker likely has a gap — the configuration may be mathematically impossible to schedule even though the pre-check passed.
 - **Constraints not being applied**: Verify that the constraint `type` string in the frontend form matches exactly what `ga.js` checks for in `checkHardConstraintViolations()` or `computeSoftPenalty()`.
-- **Auth issues**: Clear `sessionStorage` in the browser. If the token is expired or malformed, the session will silently fail.
+- **Auth issues**: Clear `sessionStorage` in the browser. If the token is expired or malformed, the session will silently fail. If the Google button doesn't render, check that `GOOGLE_CLIENT_ID` is set on the server and that the page's origin is listed under "Authorized JavaScript origins" for that OAuth client.
 - **Excel export errors**: Errors in `createExcelTimetable()` are usually caused by unexpected null values in the formatted solution. Check the `formatSolution()` output first.
 
 ---

@@ -53,12 +53,12 @@ class GeneticAlgorithm {
     this.eliteSize      = 8;
     this.tournamentSize = 4;
 
-    this.standards   = constraints.standards;
-    this.faculty     = constraints.faculty;
-    this.assignments = constraints.assignments;
-    this.classrooms  = constraints.classrooms;
-    this.daysOfWeek  = constraints.daysOfWeek;
-    this.timeSlots   = constraints.timeSlots;
+    this.standards   = constraints.standards   || [];
+    this.faculty     = constraints.faculty     || [];
+    this.assignments = constraints.assignments || [];
+    this.classrooms  = constraints.classrooms  || [];
+    this.daysOfWeek  = constraints.daysOfWeek  || [];
+    this.timeSlots   = constraints.timeSlots   || [];
 
     this.hardConstraints = constraints.hardConstraints || [];
     this.softConstraints = constraints.softConstraints || [];
@@ -105,7 +105,13 @@ class GeneticAlgorithm {
           const blocked = this._blockedFacultySlots.get(hc.facultyId);
           if (hc.timeslot) {
             const si = this.timeSlots.findIndex(s => s.startTime === hc.timeslot);
+            // [FIX] A stale hc.timeslot (no longer matching any current time
+            // slot, e.g. after slots were edited) must be ignored the same
+            // way here as in _findConflictingGeneIndices/checkHardConstraintViolations
+            // below — otherwise construction thinks the day is open while
+            // scoring blocks it entirely, producing an unrepairable conflict.
             if (si !== -1) blocked.add(`${dayIdx}-${si}`);
+            else console.warn(`[faculty_unavailability] Timeslot "${hc.timeslot}" not found among current time slots — constraint ignored.`);
           } else {
             this.timeSlots.forEach((_, si) => blocked.add(`${dayIdx}-${si}`));
           }
@@ -503,10 +509,17 @@ class GeneticAlgorithm {
       switch (hc.type) {
 
         case 'faculty_unavailability': {
-          const dayIdx  = this.daysOfWeek.indexOf(hc.day);
-          const slotIdx = hc.timeslot
-            ? this.timeSlots.findIndex(s => s.startTime === hc.timeslot)
-            : -1;
+          const dayIdx = this.daysOfWeek.indexOf(hc.day);
+          // A timeslot is only "no restriction" (whole day blocked) when the
+          // constraint genuinely has none. A timeslot that was set but no
+          // longer matches any current slot must be ignored, not treated as
+          // "whole day" — see the matching note in _buildConstraintIndex.
+          let slotIdx = -1, staleSlot = false;
+          if (hc.timeslot) {
+            slotIdx = this.timeSlots.findIndex(s => s.startTime === hc.timeslot);
+            if (slotIdx === -1) staleSlot = true;
+          }
+          if (staleSlot) break;
           individual.genes.forEach((g, i) => {
             if (g.facultyId !== hc.facultyId || g.dayIdx !== dayIdx) return;
             if (slotIdx === -1 || g.timeSlotIdx === slotIdx) conflicting.add(i);
@@ -610,10 +623,13 @@ class GeneticAlgorithm {
       switch (hc.type) {
 
         case 'faculty_unavailability': {
-          const dayIdx  = this.daysOfWeek.indexOf(hc.day);
-          const slotIdx = hc.timeslot
-            ? this.timeSlots.findIndex(s => s.startTime === hc.timeslot)
-            : -1;
+          const dayIdx = this.daysOfWeek.indexOf(hc.day);
+          let slotIdx = -1, staleSlot = false;
+          if (hc.timeslot) {
+            slotIdx = this.timeSlots.findIndex(s => s.startTime === hc.timeslot);
+            if (slotIdx === -1) staleSlot = true;
+          }
+          if (staleSlot) break;
           individual.genes.forEach(g => {
             if (g.facultyId !== hc.facultyId || g.dayIdx !== dayIdx) return;
             if (slotIdx === -1 || g.timeSlotIdx === slotIdx) violations++;

@@ -5,6 +5,7 @@
   <title>Login – Timetable Generator</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'IBM Plex Sans', sans-serif; }
 
@@ -52,6 +53,7 @@
       border-radius: 14px;
       padding: 36px 32px;
       box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+      text-align: center;
     }
 
     .login-card h2 {
@@ -66,91 +68,13 @@
       margin-bottom: 28px;
     }
 
-    .form-group {
-      margin-bottom: 20px;
-    }
-
-    label {
-      display: block;
-      font-size: 13px;
-      font-weight: 600;
-      color: #94a3b8;
-      margin-bottom: 7px;
-    }
-
-    input {
-      width: 100%;
-      padding: 11px 14px;
-      border: 1.5px solid #2e3250;
-      border-radius: 8px;
-      font-size: 14px;
-      color: #e2e8f0;
-      transition: border-color 0.25s, box-shadow 0.25s;
-      background: #22263a;
-    }
-
-    input:focus {
-      outline: none;
-      border-color: #4f6ef7;
-      background: #22263a;
-      box-shadow: 0 0 0 3px rgba(79,110,247,0.15);
-    }
-
-    .hint {
-      font-size: 11.5px;
-      color: #475569;
-      margin-top: 5px;
-    }
-
-    .password-wrapper {
-      position: relative;
-    }
-
-    .toggle-pw {
-      position: absolute;
-      right: 12px;
-      top: 50%;
-      transform: translateY(-50%);
-      background: none;
-      border: none;
-      cursor: pointer;
-      color: #475569;
-      font-size: 16px;
-      padding: 4px;
-      line-height: 1;
-    }
-
-    .toggle-pw:hover { color: #94a3b8; }
-
-    .btn-login {
-      width: 100%;
-      padding: 12px;
-      background: #4f6ef7;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-size: 15px;
-      font-weight: 600;
-      cursor: pointer;
-      transition: all 0.25s;
-      margin-top: 8px;
-      box-shadow: 0 0 20px rgba(79,110,247,0.3);
-    }
-
-    .btn-login:hover:not(:disabled) {
-      background: #3b5bdb;
-      box-shadow: 0 0 28px rgba(79,110,247,0.5);
-      transform: translateY(-1px);
-    }
-
-    .btn-login:disabled { opacity: 0.65; cursor: not-allowed; transform: none; }
-
     .alert {
       padding: 12px 14px;
       border-radius: 7px;
       font-size: 13.5px;
       margin-bottom: 20px;
       display: none;
+      text-align: left;
     }
 
     .alert.show { display: block; }
@@ -158,30 +82,19 @@
     .alert-error   { background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
     .alert-success { background: rgba(34,197,94,0.15); color: #86efac; border: 1px solid rgba(34,197,94,0.3); }
 
-    .domain-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      background: rgba(79,110,247,0.15);
-      color: #818cf8;
-      border: 1px solid rgba(79,110,247,0.3);
-      border-radius: 20px;
-      padding: 4px 12px;
-      font-size: 12px;
-      font-weight: 600;
-      margin-top: 22px;
+    #googleBtnContainer {
+      display: flex;
+      justify-content: center;
+      min-height: 44px;
     }
 
     .spinner {
       display: inline-block;
-      width: 14px; height: 14px;
-      border: 2px solid rgba(255,255,255,0.3);
-      border-top-color: white;
+      width: 22px; height: 22px;
+      border: 2px solid rgba(255,255,255,0.15);
+      border-top-color: #4f6ef7;
       border-radius: 50%;
       animation: spin 0.7s linear infinite;
-      margin-right: 6px;
-      vertical-align: middle;
-      display: none;
     }
 
     @keyframes spin { to { transform: rotate(360deg); } }
@@ -204,47 +117,13 @@
   </div>
 
   <div class="login-card">
-    <h2>Welcome back </h2>
-    <p class="subtitle">Sign in to access the timetable generator</p>
+    <h2>Welcome</h2>
+    <p class="subtitle">Sign in with Google to access your projects</p>
 
     <div id="alertBox" class="alert"></div>
 
-    <div class="form-group">
-      <label for="emailInput">Institutional Email</label>
-      <input
-        type="email"
-        id="emailInput"
-        placeholder="yourname@diu.iiitvadodara.ac.in"
-        autocomplete="email"
-      />
-      <div class="hint">Only @diu.iiitvadodara.ac.in emails are accepted</div>
-    </div>
-
-    <div class="form-group">
-      <label for="passwordInput">Password</label>
-      <div class="password-wrapper">
-        <input
-          type="password"
-          id="passwordInput"
-          placeholder="Enter your password"
-          autocomplete="current-password"
-          onkeydown="if(event.key==='Enter') doLogin()"
-        />
-        <button class="toggle-pw" onclick="togglePassword()" title="Show/hide password">👁</button>
-      </div>
-    </div>
-
-    <button class="btn-login" id="loginBtn" onclick="doLogin()">
-      <span class="spinner" id="spinner"></span>
-      Sign In
-    </button>
-
-    <div style="text-align:center;">
-      <span class="domain-badge"> @diu.iiitvadodara.ac.in only</span>
-    </div>
+    <div id="googleBtnContainer"><div class="spinner"></div></div>
   </div>
-
- 
 </div>
 
 <script>
@@ -265,57 +144,85 @@
     document.getElementById('alertBox').className = 'alert';
   }
 
-  function togglePassword() {
-    const inp = document.getElementById('passwordInput');
-    inp.type = inp.type === 'password' ? 'text' : 'password';
-  }
-
-  async function doLogin() {
+  async function handleGoogleCredential(response) {
     hideAlert();
-    const email    = document.getElementById('emailInput').value.trim();
-    const password = document.getElementById('passwordInput').value;
-
-    // Client-side domain check (server also enforces this)
-    if (!email.endsWith('@diu.iiitvadodara.ac.in')) {
-      showAlert('❌ Only @diu.iiitvadodara.ac.in email addresses are allowed.', 'error');
-      return;
-    }
-
-    if (!password) {
-      showAlert('Please enter your password.', 'error');
-      return;
-    }
-
-    const btn     = document.getElementById('loginBtn');
-    const spinner = document.getElementById('spinner');
-    btn.disabled  = true;
-    spinner.style.display = 'inline-block';
-
     try {
-      const res  = await fetch(`${API_BASE_URL}/api/login`, {
+      const res  = await fetch(`${API_BASE_URL}/api/auth/google`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
+        body: JSON.stringify({ credential: response.credential })
       });
-
       const data = await res.json();
 
       if (res.ok && data.success) {
         sessionStorage.setItem('auth_token', data.token);
         sessionStorage.setItem('auth_email', data.email);
-        showAlert(' Login successful! Redirecting…', 'success');
-        setTimeout(() => { window.location.href = 'dashboard.html'; }, 800);
+        showAlert('Login successful! Redirecting…', 'success');
+        setTimeout(() => { window.location.href = 'dashboard.html'; }, 500);
       } else {
-        showAlert(' ' + (data.error || 'Invalid email or password.'), 'error');
-        btn.disabled = false;
-        spinner.style.display = 'none';
+        showAlert(data.error || 'Google sign-in failed.', 'error');
       }
     } catch (err) {
-      showAlert('⚠️ Cannot reach the server. Make sure the backend is running on port 5000.', 'error');
-      btn.disabled = false;
-      spinner.style.display = 'none';
+      showAlert('⚠️ Cannot reach the server. Make sure the backend is running.', 'error');
     }
   }
+
+  // The GSI <script> tag loads asynchronously, so wait for window.google.accounts
+  // to actually appear (polling, since the script has no reliable onload hook here).
+  function waitForGoogleSdk(timeoutMs = 8000) {
+    return new Promise((resolve, reject) => {
+      const start = Date.now();
+      (function check() {
+        if (window.google && window.google.accounts && window.google.accounts.id) {
+          resolve();
+        } else if (Date.now() - start > timeoutMs) {
+          reject(new Error('Google Sign-In script failed to load in time.'));
+        } else {
+          setTimeout(check, 100);
+        }
+      })();
+    });
+  }
+
+  async function initGoogleSignIn() {
+    const container = document.getElementById('googleBtnContainer');
+    try {
+      const res  = await fetch(`${API_BASE_URL}/api/config`);
+      const data = await res.json();
+
+      if (!data.googleClientId) {
+        container.innerHTML = '';
+        showAlert('Google Sign-In is not configured on this server yet.', 'error');
+        return;
+      }
+
+      try {
+        await waitForGoogleSdk();
+      } catch {
+        container.innerHTML = '';
+        showAlert('Could not load Google Sign-In. Check your connection and reload.', 'error');
+        return;
+      }
+
+      google.accounts.id.initialize({
+        client_id: data.googleClientId,
+        callback: handleGoogleCredential
+      });
+
+      container.innerHTML = '';
+      google.accounts.id.renderButton(container, {
+        theme: 'filled_blue',
+        size: 'large',
+        width: 300,
+        text: 'signin_with'
+      });
+    } catch (err) {
+      container.innerHTML = '';
+      showAlert('⚠️ Cannot reach the server. Make sure the backend is running.', 'error');
+    }
+  }
+
+  initGoogleSignIn();
 </script>
 </body>
 </html>

@@ -1,10 +1,12 @@
+require('dotenv').config();
+
 const express  = require('express');
 const cors     = require('cors');
 const ExcelJS  = require('exceljs');
 const path     = require('path');
 const fs       = require('fs');
-const bcrypt   = require('bcryptjs');
 const jwt      = require('jsonwebtoken');
+const { OAuth2Client } = require('google-auth-library');
 const GeneticAlgorithm = require('./ga');
 
 const app  = express();
@@ -13,9 +15,9 @@ const PORT = process.env.PORT || 5000;
 // ─────────────────────────────────────────────
 // CONFIG
 // ─────────────────────────────────────────────
-const JWT_SECRET    = process.env.JWT_SECRET || 'timetable_secret_change_me_in_production';
-const ALLOWED_DOMAIN = '@diu.iiitvadodara.ac.in';
-const USERS_FILE    = path.join(__dirname, 'users.json');
+const JWT_SECRET      = process.env.JWT_SECRET || 'timetable_secret_change_me_in_production';
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+const googleClient    = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 // ─────────────────────────────────────────────
 // MIDDLEWARE
@@ -69,16 +71,6 @@ function saveUserProjects(email, projects) {
 // AUTH HELPERS
 // ─────────────────────────────────────────────
 
-/** Load users from users.json */
-function loadUsers() {
-  if (!fs.existsSync(USERS_FILE)) return [];
-  try {
-    return JSON.parse(fs.readFileSync(USERS_FILE, 'utf-8'));
-  } catch {
-    return [];
-  }
-}
-
 /** Middleware: verify JWT token on protected routes */
 function requireAuth(req, res, next) {
   const authHeader = req.headers['authorization'];
@@ -104,52 +96,49 @@ function requireAuth(req, res, next) {
 // ─────────────────────────────────────────────
 
 /**
- * POST /api/login
- * Body: { email, password }
+ * GET /api/config – public config the frontend needs before login
  */
-app.post('/api/login', async (req, res) => {
+app.get('/api/config', (req, res) => {
+  res.json({ success: true, googleClientId: GOOGLE_CLIENT_ID });
+});
+
+/**
+ * POST /api/auth/google
+ * Body: { credential }  — the ID token from Google Identity Services
+ * Any verified Google account may sign in; the user's projects are
+ * scoped by their Google email, no local password/user table needed.
+ */
+app.post('/api/auth/google', async (req, res) => {
   try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ success: false, error: 'Email and password are required.' });
+    const { credential } = req.body;
+    if (!credential) {
+      return res.status(400).json({ success: false, error: 'Missing Google credential.' });
+    }
+    if (!GOOGLE_CLIENT_ID) {
+      return res.status(500).json({ success: false, error: 'Server is not configured for Google Sign-In (GOOGLE_CLIENT_ID missing).' });
     }
 
-    // Domain check
-    if (!email.trim().toLowerCase().endsWith(ALLOWED_DOMAIN)) {
-      return res.status(403).json({
-        success: false,
-        error: `Only ${ALLOWED_DOMAIN} email addresses are allowed.`
-      });
+    const ticket = await googleClient.verifyIdToken({
+      idToken: credential,
+      audience: GOOGLE_CLIENT_ID
+    });
+    const payload = ticket.getPayload();
+
+    if (!payload || !payload.email_verified) {
+      return res.status(401).json({ success: false, error: 'Google account email is not verified.' });
     }
 
-    // Find user
-    const users = loadUsers();
-    const user  = users.find(u => u.email.toLowerCase() === email.trim().toLowerCase());
+    const email = payload.email.toLowerCase();
+    const name  = payload.name || email.split('@')[0];
 
-    if (!user) {
-      return res.status(401).json({ success: false, error: 'Invalid email or password.' });
-    }
+    const token = jwt.sign({ email, name }, JWT_SECRET, { expiresIn: '8h' });
 
-    // Compare password
-    const valid = await bcrypt.compare(password, user.passwordHash);
-    if (!valid) {
-      return res.status(401).json({ success: false, error: 'Invalid email or password.' });
-    }
-
-    // Issue JWT (expires in 8 hours)
-    const token = jwt.sign(
-      { email: user.email, name: user.name, role: user.role },
-      JWT_SECRET,
-      { expiresIn: '8h' }
-    );
-
-    console.log(`✓ Login: ${user.email}`);
-    res.json({ success: true, token, email: user.email, name: user.name });
+    console.log(`✓ Google login: ${email}`);
+    res.json({ success: true, token, email, name });
 
   } catch (err) {
-    console.error('Login error:', err);
-    res.status(500).json({ success: false, error: 'Server error during login.' });
+    console.error('Google login error:', err);
+    res.status(401).json({ success: false, error: 'Google sign-in failed. Please try again.' });
   }
 });
 
@@ -554,8 +543,9 @@ function validateInput(data) {
     const tpw = parseInt(a.timesPerWeek);
     if (isNaN(tpw) || tpw < 1)
       errors.push(`${label}: Times per week must be at least 1`);
-    if (tpw > data.daysOfWeek.length)
-      errors.push(`${label}: Times per week (${tpw}) cannot exceed the number of selected days (${data.daysOfWeek.length})`);
+    const dayCount = (data.daysOfWeek || []).length;
+    if (tpw > dayCount)
+      errors.push(`${label}: Times per week (${tpw}) cannot exceed the number of selected days (${dayCount})`);
   });
 
   return { isValid: errors.length === 0, errors };
@@ -836,8 +826,12 @@ function cleanupOldOutputFiles() {
 // ─────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`\n✓ Server running on http://localhost:${PORT}`);
-  console.log(`✓ Auth enabled – domain restricted to ${ALLOWED_DOMAIN}`);
-  console.log(`✓ POST http://localhost:${PORT}/api/login`);
+  if (!GOOGLE_CLIENT_ID) {
+    console.warn(`⚠ GOOGLE_CLIENT_ID is not set – Google Sign-In will not work until it is configured.`);
+  } else {
+    console.log(`✓ Google Sign-In enabled`);
+  }
+  console.log(`✓ POST http://localhost:${PORT}/api/auth/google`);
   console.log(`✓ POST http://localhost:${PORT}/api/generate-timetable  (requires auth)`);
   console.log(`✓ Output files saved to: ${outputDir}\n`);
 });
