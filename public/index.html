@@ -592,6 +592,13 @@
       <p>Automated conflict-free schedule planning</p>
     </div>
 
+    <!-- Demo data -->
+    <div class="section" id="demoPanel">
+      <div class="section-title">Try it with sample data</div>
+      <p class="section-subtitle">Fills this project with a complete sample school — 6 standards, 3 divisions each, 27 teachers and a few realistic constraints — so you can see a full schedule without typing anything in.</p>
+      <button class="btn-add" style="margin-top:0;" id="demoBtn" onclick="fillDemoData()">Fill demo data</button>
+    </div>
+
     <!-- Standards Section -->
     <div class="section">
       <div class="section-title">Standards &amp; Courses</div>
@@ -644,9 +651,8 @@
     <!-- Course Assignments Section -->
     <div class="section">
       <div class="section-title">Course Assignments</div>
-      <p class="section-subtitle">Assign each course to a faculty member and set how many times per week it meets.</p>
-      <div id="assignmentContainer"></div>
-      <button class="btn-add" onclick="addAssignment()">+ Add assignment</button>
+      <p class="section-subtitle">Pick the teacher for each course in each division, and how many times a week it meets. The same teacher can take a course for several divisions.</p>
+      <div id="assignmentMatrix"></div>
     </div>
 
     <!-- Constraints Section -->
@@ -700,13 +706,26 @@
     <!-- Loading Indicator -->
     <div class="loading" id="loadingIndicator">
       <div class="spinner"></div>
-      <p>Generating a conflict-free schedule…</p>
+      <p id="loadingHeadline">Generating your schedule, please wait…</p>
       <p id="generationCount" style="font-size:12px; color:var(--muted); margin-top:6px;"></p>
+      <button class="btn-secondary" id="cancelBtn" style="margin-top:14px; margin-right:0;" onclick="cancelGeneration()">Cancel</button>
     </div>
+
+    <!-- Slow-run advice. Kept on screen after cancelling so the suggestions can
+         be acted on, then regenerated. -->
+    <div id="slowPanel" style="display:none;"></div>
 
     <!-- Output Section -->
     <div id="outputSection" class="section">
       <div class="section-title">Generated Schedule</div>
+
+      <!-- Soft-constraint score + the option to trade more time for a better one -->
+      <div class="output-block" id="preferencesBlock" style="display:none;">
+        <h3>Preferences</h3>
+        <p class="hint" id="preferenceSummary"></p>
+        <button class="btn-secondary" id="improveBtn" style="width:auto;margin-right:0;" onclick="improveSchedule()">Improve schedule</button>
+        <div id="improveComparison"></div>
+      </div>
 
       <div class="output-block">
         <h3>Master schedule</h3>
@@ -715,8 +734,8 @@
       </div>
 
       <div class="output-block">
-        <h3>Standard timetables</h3>
-        <p class="hint">A week view for each standard, with export options.</p>
+        <h3>Division timetables</h3>
+        <p class="hint">A week view for each division, with export options.</p>
         <div id="standardTimetablesContainer"></div>
       </div>
 
@@ -843,9 +862,12 @@
     }
 
     // Data structures
+    // standards[].divisions = [{ id, label, roomId }] — a division is the unit that
+    // gets scheduled: its students move together and it owns one classroom.
     let standards = [];
     let faculty = [];
-    let assignments = [];
+    let assignments = [];   // { id, divisionId, courseId, facultyId, timesPerWeek }
+    let classrooms = [];    // { id, name }
     let selectedDays = [];
     let timeSlots = [];
     let timeSlotsCount = 1;
@@ -869,10 +891,35 @@
       }, 5000);
     }
 
-    // Get classroom data
+    // Classrooms are objects ({ id, name }) because divisions reference a room by
+    // id — pinning by name would break the link the moment a room is renamed.
     function getClassrooms() {
-      const inputs = document.querySelectorAll('#roomContainer input');
-      return Array.from(inputs).map(input => input.value).filter(v => v);
+      return classrooms.filter(r => r.name && r.name.trim());
+    }
+
+    function classroomName(roomId) {
+      const room = classrooms.find(r => r.id === roomId);
+      return room ? room.name : '';
+    }
+
+    /** All division objects across every standard, flattened. */
+    function allDivisions() {
+      return standards.flatMap(std =>
+        (std.divisions || []).map(d => ({ ...d, standardId: std.id, standardName: std.name }))
+      );
+    }
+
+    /** Display name for a division, e.g. "1st-A". */
+    function divisionName(division, standard) {
+      const std = standard || standards.find(s => (s.divisions || []).some(d => d.id === division.id));
+      return `${std ? std.name : ''}-${division.label}`;
+    }
+
+    /** First classroom not already claimed by a division, or null. */
+    function nextFreeRoomId() {
+      const taken = new Set(allDivisions().map(d => d.roomId).filter(Boolean));
+      const free  = classrooms.find(r => !taken.has(r.id));
+      return free ? free.id : null;
     }
 
     // Update selected days
@@ -886,75 +933,216 @@
     // NOTE: all handlers below look up standards/courses by their stable `id`,
     // never by array index — indices baked into onclick/onchange attributes go
     // stale as soon as an earlier item in the list is removed.
-    function addStandard() {
-      const container = document.getElementById("standardsContainer");
-      const standardId = uid('standard');
+    /** Next division label: A, B, C … then A2, B2 … if a school ever needs >26. */
+    function nextDivisionLabel(standard) {
+      const used = new Set((standard.divisions || []).map(d => d.label));
+      for (let i = 0; i < 26; i++) {
+        const label = String.fromCharCode(65 + i);
+        if (!used.has(label)) return label;
+      }
+      return 'D' + ((standard.divisions || []).length + 1);
+    }
 
+    // One renderer for a standard card, used both when adding a new one and when
+    // restoring a saved project — keeping two copies of this template in sync is
+    // what caused the stale-index bug previously.
+    function renderStandardCard(standard) {
+      const container = document.getElementById('standardsContainer');
+      document.getElementById(standard.id)?.remove();
+
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.id = standard.id;
+      card.innerHTML = `
+        <div class="grid">
+          <div>
+            <label>Standard name</label>
+            <input type="text" value="${esc(standard.name)}" placeholder="e.g. 1st"
+              onchange="updateStandardName('${standard.id}', this.value)">
+          </div>
+          <div>
+            <label>Number of divisions</label>
+            <input type="number" min="1" max="26" value="${(standard.divisions || []).length || 1}"
+              onchange="setDivisionCount('${standard.id}', parseInt(this.value))">
+          </div>
+        </div>
+
+        <div id="${standard.id}-divisions" style="margin-top:14px;"></div>
+
+        <div style="margin-top: 16px;">
+          <p style="margin:0 0 8px 0; font-weight:600; font-size:13px; color:var(--text);">Courses</p>
+          <p style="margin:0 0 10px 0; font-size:12px; color:var(--muted);">Every division of this standard studies these courses.</p>
+          <div id="${standard.id}-courses"></div>
+          <button class="btn-add" style="margin-top: 10px;" onclick="addCourse('${standard.id}')">+ Add course</button>
+        </div>
+
+        <button class="btn-remove" onclick="removeStandard('${standard.id}')">Remove standard</button>
+      `;
+      container.appendChild(card);
+
+      renderStandardDivisions(standard.id);
+      (standard.courses || []).forEach(c => renderCourseCard(standard.id, c));
+    }
+
+    function addStandard() {
+      const standardId = uid('standard');
       standards.push({
         id: standardId,
         name: '',
-        courses: []
+        courses: [],
+        divisions: [{ id: uid('div'), label: 'A', roomId: nextFreeRoomId() }]
       });
-
-      const cardDiv = document.createElement('div');
-      cardDiv.className = 'card';
-      cardDiv.id = standardId;
-      cardDiv.innerHTML = `
-        <div>
-          <label>Standard name</label>
-          <input type="text" placeholder="e.g. 8-A" onchange="updateStandardName('${standardId}', this.value)">
-        </div>
-
-        <div style="margin-top: 15px;">
-          <p style="margin:0 0 8px 0; font-weight:600; font-size:13px; color:var(--text);">Courses</p>
-          <div id="${standardId}-courses"></div>
-          <button class="btn-add" style="margin-top: 10px;" onclick="addCourse('${standardId}')">+ Add course</button>
-        </div>
-
-        <button class="btn-remove" onclick="removeStandard('${standardId}')">Remove standard</button>
-      `;
-      container.appendChild(cardDiv);
+      renderStandardCard(standards[standards.length - 1]);
+      renderAssignmentMatrix();
+      markDirty();
     }
 
     function updateStandardName(standardId, name) {
       const standard = standards.find(s => s.id === standardId);
       if (!standard) return;
       standard.name = name;
-      updateAssignmentDropdowns();
+      renderStandardDivisions(standardId);  // division labels show "1st-A"
+      renderAssignmentMatrix();
+      refreshConstraintDropdowns();
       markDirty();
+    }
+
+    // ── Divisions ───────────────────────────────────────────────────────
+    function renderStandardDivisions(standardId) {
+      const standard = standards.find(s => s.id === standardId);
+      const host = document.getElementById(`${standardId}-divisions`);
+      if (!standard || !host) return;
+
+      const takenElsewhere = new Set(
+        allDivisions().filter(d => d.standardId !== standardId).map(d => d.roomId).filter(Boolean)
+      );
+
+      const rows = (standard.divisions || []).map(d => {
+        const options = ['<option value="">No classroom</option>'].concat(
+          classrooms.map(r => {
+            const usedByOther = takenElsewhere.has(r.id) ||
+              (standard.divisions || []).some(o => o.id !== d.id && o.roomId === r.id);
+            return `<option value="${r.id}" ${r.id === d.roomId ? 'selected' : ''} ${usedByOther ? 'disabled' : ''}>${esc(r.name)}${usedByOther ? ' — taken' : ''}</option>`;
+          })
+        ).join('');
+
+        return `
+          <div style="display:flex; gap:10px; align-items:flex-end; margin-bottom:8px; flex-wrap:wrap;">
+            <div style="width:110px;">
+              <label>Division</label>
+              <input type="text" value="${esc(d.label)}" maxlength="6"
+                onchange="updateDivisionLabel('${standardId}','${d.id}',this.value)">
+            </div>
+            <div style="flex:1; min-width:170px;">
+              <label>Classroom${standard.name ? ` for ${esc(standard.name)}-${esc(d.label)}` : ''}</label>
+              <select onchange="updateDivisionRoom('${standardId}','${d.id}',this.value)">${options}</select>
+            </div>
+          </div>`;
+      }).join('');
+
+      const shortfall = allDivisions().length - classrooms.length;
+      const warning = shortfall > 0
+        ? `<p style="margin:4px 0 0 0; font-size:12px; color:var(--danger);">${shortfall} more classroom${shortfall > 1 ? 's' : ''} needed — every division must have its own room.</p>`
+        : '';
+
+      host.innerHTML = `
+        <p style="margin:0 0 8px 0; font-weight:600; font-size:13px; color:var(--text);">Divisions</p>
+        <p style="margin:0 0 10px 0; font-size:12px; color:var(--muted);">Each division stays in its own classroom all week.</p>
+        ${rows}${warning}`;
+    }
+
+    /** Grow or shrink a standard's divisions to `count`, auto-claiming free rooms. */
+    function setDivisionCount(standardId, count) {
+      const standard = standards.find(s => s.id === standardId);
+      if (!standard) return;
+      if (isNaN(count) || count < 1) count = 1;
+      if (count > 26) count = 26;
+
+      const divisions = standard.divisions || (standard.divisions = []);
+
+      while (divisions.length < count) {
+        divisions.push({ id: uid('div'), label: nextDivisionLabel(standard), roomId: nextFreeRoomId() });
+      }
+
+      while (divisions.length > count) {
+        const removed = divisions[divisions.length - 1];
+        const used = assignments.some(a => a.divisionId === removed.id);
+        if (used && !confirm(`${standard.name || 'This standard'}-${removed.label} has teachers assigned. Remove it anyway?`)) {
+          break;
+        }
+        divisions.pop();
+        // Drop assignments that belonged to the removed division
+        for (let i = assignments.length - 1; i >= 0; i--) {
+          if (assignments[i].divisionId === removed.id) assignments.splice(i, 1);
+        }
+      }
+
+      // Reflect any clamping back into the input
+      const input = document.querySelector(`#${CSS.escape(standardId)} input[type="number"]`);
+      if (input) input.value = divisions.length;
+
+      renderStandardDivisions(standardId);
+      renderAssignmentMatrix();
+      markDirty();
+    }
+
+    function updateDivisionLabel(standardId, divisionId, label) {
+      const standard = standards.find(s => s.id === standardId);
+      const division = standard && (standard.divisions || []).find(d => d.id === divisionId);
+      if (!division) return;
+      division.label = (label || '').trim() || division.label;
+      renderStandardDivisions(standardId);
+      renderAssignmentMatrix();
+      markDirty();
+    }
+
+    function updateDivisionRoom(standardId, divisionId, roomId) {
+      const standard = standards.find(s => s.id === standardId);
+      const division = standard && (standard.divisions || []).find(d => d.id === divisionId);
+      if (!division) return;
+      division.roomId = roomId || null;
+      // A room can serve only one division — re-render every standard so the
+      // "taken" markers stay accurate across cards.
+      standards.forEach(s => renderStandardDivisions(s.id));
+      markDirty();
+    }
+
+    // ── Courses ─────────────────────────────────────────────────────────
+    function renderCourseCard(standardId, course) {
+      const container = document.getElementById(`${standardId}-courses`);
+      if (!container) return;
+      document.getElementById(course.id)?.remove();
+
+      const sub = document.createElement('div');
+      sub.className = 'sub-card';
+      sub.id = course.id;
+      sub.innerHTML = `
+        <div class="sub-card-grid">
+          <div>
+            <label>Course name</label>
+            <input type="text" value="${esc(course.name)}" placeholder="e.g. Mathematics"
+              onchange="updateCourseName('${standardId}', '${course.id}', 'name', this.value)">
+          </div>
+          <div>
+            <label>Course code</label>
+            <input type="text" value="${esc(course.courseCode)}" placeholder="e.g. MATH101"
+              onchange="updateCourseName('${standardId}', '${course.id}', 'courseCode', this.value)">
+          </div>
+        </div>
+        <button class="btn-remove" style="font-size: 11px; padding: 4px 8px;"
+          onclick="removeCourse('${course.id}', '${standardId}')">Remove course</button>
+      `;
+      container.appendChild(sub);
     }
 
     function addCourse(standardId) {
       const standard = standards.find(s => s.id === standardId);
       if (!standard) return;
-      const courseId = uid('course');
-
-      standard.courses.push({
-        id: courseId,
-        name: '',
-        courseCode: ''
-      });
-
-      const container = document.getElementById(`${standard.id}-courses`);
-      const subCardDiv = document.createElement('div');
-      subCardDiv.className = 'sub-card';
-      subCardDiv.id = courseId;
-      subCardDiv.innerHTML = `
-        <div class="sub-card-grid">
-          <div>
-            <label>Course name</label>
-            <input type="text" placeholder="e.g. Mathematics" onchange="updateCourseName('${standardId}', '${courseId}', 'name', this.value)">
-          </div>
-          <div>
-            <label>Course code</label>
-            <input type="text" placeholder="e.g. MATH101" onchange="updateCourseName('${standardId}', '${courseId}', 'courseCode', this.value)">
-          </div>
-        </div>
-        <button class="btn-remove" style="font-size: 11px; padding: 4px 8px;" onclick="removeCourse('${courseId}', '${standardId}')">Remove course</button>
-      `;
-      container.appendChild(subCardDiv);
-
-      updateAssignmentDropdowns();
+      const course = { id: uid('course'), name: '', courseCode: '' };
+      standard.courses.push(course);
+      renderCourseCard(standardId, course);
+      renderAssignmentMatrix();
+      markDirty();
     }
 
     function updateCourseName(standardId, courseId, field, value) {
@@ -962,7 +1150,8 @@
       const course   = standard && standard.courses.find(c => c.id === courseId);
       if (!course) return;
       course[field] = value;
-      updateAssignmentDropdowns();
+      renderAssignmentMatrix();
+      refreshConstraintDropdowns();
       markDirty();
     }
 
@@ -972,66 +1161,79 @@
       const courseIndex = standard.courses.findIndex(c => c.id === courseId);
       if (courseIndex === -1) return;
 
-      document.getElementById(courseId).remove();
+      document.getElementById(courseId)?.remove();
       standard.courses.splice(courseIndex, 1);
 
-      // Clear any assignments that referenced this deleted course
-      assignments.forEach(assignment => {
-        if (assignment.courseId === courseId) {
-          assignment.courseId = '';
-        }
-      });
+      // Drop every division's assignment for this course
+      for (let i = assignments.length - 1; i >= 0; i--) {
+        if (assignments[i].courseId === courseId) assignments.splice(i, 1);
+      }
 
-      updateAssignmentDropdowns();
+      renderAssignmentMatrix();
+      refreshConstraintDropdowns();
+      markDirty();
     }
 
     function removeStandard(standardId) {
       const standardIndex = standards.findIndex(s => s.id === standardId);
       if (standardIndex === -1) return;
-      if (confirm('Remove this standard and all its courses?')) {
-        document.getElementById(standardId).remove();
-        standards.splice(standardIndex, 1);
-        updateAssignmentDropdowns();
+      if (!confirm('Remove this standard, its divisions and all its courses?')) return;
+
+      const removed = standards[standardIndex];
+      const divisionIds = new Set((removed.divisions || []).map(d => d.id));
+      for (let i = assignments.length - 1; i >= 0; i--) {
+        if (divisionIds.has(assignments[i].divisionId)) assignments.splice(i, 1);
       }
+
+      document.getElementById(standardId)?.remove();
+      standards.splice(standardIndex, 1);
+      renderAssignmentMatrix();
+      refreshConstraintDropdowns();
+      markDirty();
     }
 
     // Faculty Management
-    function addFaculty() {
-      const container = document.getElementById("facultyContainer");
-      const facultyId = uid('faculty');
-
-      faculty.push({
-        id: facultyId,
-        name: '',
-        facultyCode: ''
-      });
+    // Single renderer used by the add button, project load and demo data alike
+    function renderFacultyCard(fac) {
+      const container = document.getElementById('facultyContainer');
+      document.getElementById(fac.id)?.remove();
 
       const cardDiv = document.createElement('div');
       cardDiv.className = 'card';
-      cardDiv.id = facultyId;
+      cardDiv.id = fac.id;
       cardDiv.innerHTML = `
         <div class="grid">
           <div>
             <label>Faculty name</label>
-            <input type="text" placeholder="Full name" onchange="updateFaculty('${facultyId}', 'name', this.value)">
+            <input type="text" value="${esc(fac.name)}" placeholder="Full name"
+              onchange="updateFaculty('${fac.id}', 'name', this.value)">
           </div>
           <div>
             <label>Faculty code</label>
-            <input type="text" placeholder="e.g. FAC01" onchange="updateFaculty('${facultyId}', 'facultyCode', this.value)">
+            <input type="text" value="${esc(fac.facultyCode)}" placeholder="e.g. FAC01"
+              onchange="updateFaculty('${fac.id}', 'facultyCode', this.value)">
           </div>
         </div>
-        <button class="btn-remove" onclick="removeFaculty('${facultyId}')">Remove</button>
+        <button class="btn-remove" onclick="removeFaculty('${fac.id}')">Remove</button>
       `;
       container.appendChild(cardDiv);
+    }
 
-      updateAssignmentDropdowns();
+    function addFaculty() {
+      const facultyId = uid('faculty');
+      faculty.push({ id: facultyId, name: '', facultyCode: '' });
+      renderFacultyCard(faculty[faculty.length - 1]);
+
+      renderAssignmentMatrix();
+      markDirty();
     }
 
     function updateFaculty(facultyId, field, value) {
       const fac = faculty.find(f => f.id === facultyId);
       if (!fac) return;
       fac[field] = value;
-      updateAssignmentDropdowns();
+      renderAssignmentMatrix();
+      refreshConstraintDropdowns();
       markDirty();
     }
 
@@ -1039,158 +1241,180 @@
       const facultyIndex = faculty.findIndex(f => f.id === facultyId);
       if (facultyIndex === -1) return;
 
-      document.getElementById(facultyId).remove();
+      document.getElementById(facultyId)?.remove();
       faculty.splice(facultyIndex, 1);
 
-      // Clear any assignments that referenced this deleted faculty
-      assignments.forEach(assignment => {
-        if (assignment.facultyId === facultyId) {
-          assignment.facultyId = '';
-        }
-      });
+      // Their assignments can't stand without a teacher — drop them outright
+      // (an assignment with no faculty is rejected by validation anyway).
+      for (let i = assignments.length - 1; i >= 0; i--) {
+        if (assignments[i].facultyId === facultyId) assignments.splice(i, 1);
+      }
 
-      updateAssignmentDropdowns();
-    }
-
-    // Assignment Management
-    function addAssignment() {
-      const container = document.getElementById("assignmentContainer");
-      const assignmentId = uid('assignment');
-
-      assignments.push({
-        id: assignmentId,
-        courseId: '',
-        facultyId: '',
-        timesPerWeek: 1
-      });
-
-      const cardDiv = document.createElement('div');
-      cardDiv.className = 'card';
-      cardDiv.id = assignmentId;
-      cardDiv.innerHTML = `
-        <div class="grid">
-          <div>
-            <label>Course</label>
-            <select id="${assignmentId}-course" onchange="updateAssignment('${assignmentId}', 'courseId', this.value)">
-              <option value="">Select a course</option>
-            </select>
-          </div>
-          <div>
-            <label>Faculty</label>
-            <select id="${assignmentId}-faculty" onchange="updateAssignment('${assignmentId}', 'facultyId', this.value)">
-              <option value="">Select a faculty member</option>
-            </select>
-          </div>
-          <div>
-            <label>Times per week</label>
-            <input type="number" min="1" value="1" onchange="updateAssignment('${assignmentId}', 'timesPerWeek', parseInt(this.value))">
-          </div>
-        </div>
-        <button class="btn-remove" onclick="removeAssignment('${assignmentId}')">Remove</button>
-      `;
-      container.appendChild(cardDiv);
-
-      updateAssignmentDropdowns();
-    }
-
-    function updateAssignment(assignmentId, field, value) {
-      const assignment = assignments.find(a => a.id === assignmentId);
-      if (!assignment) return;
-      if (field === 'timesPerWeek' && (isNaN(value) || value < 1)) value = 1;
-      assignment[field] = value;
-      if (field === 'courseId') updateAssignmentDropdowns();
+      renderAssignmentMatrix();
+      refreshConstraintDropdowns();
       markDirty();
     }
 
-    function removeAssignment(assignmentId) {
-      const assignmentIndex = assignments.findIndex(a => a.id === assignmentId);
-      if (assignmentIndex === -1) return;
-      document.getElementById(assignmentId).remove();
-      assignments.splice(assignmentIndex, 1);
-      updateAssignmentDropdowns();
+    // ── Assignments: one grid per standard ──────────────────────────────
+    // Rows are courses, columns are divisions, each cell picks the teacher.
+    // A flat list would be unusable: 8 standards x 3 divisions x 8 courses is
+    // ~190 rows, whereas this is 8 compact tables.
+
+    /** The standard that owns a course, or null. */
+    function standardForCourse(courseId) {
+      return standards.find(s => (s.courses || []).some(c => c.id === courseId)) || null;
     }
 
-    function updateAssignmentDropdowns() {
-      const assignedCourseIds = assignments.map(a => a.courseId).filter(id => id);
+    function findAssignment(divisionId, courseId) {
+      return assignments.find(a => a.divisionId === divisionId && a.courseId === courseId) || null;
+    }
 
-      assignments.forEach((assignment, index) => {
-        const courseSelect = document.getElementById(`${assignment.id}-course`);
-        const facultySelect = document.getElementById(`${assignment.id}-faculty`);
+    /** Times per week is set per course and shared by all its divisions. */
+    function courseTimesPerWeek(courseId) {
+      const existing = assignments.find(a => a.courseId === courseId);
+      return existing ? (existing.timesPerWeek || 1) : 1;
+    }
 
-        if (courseSelect) {
-          // FIX: read from data model, not DOM — DOM value is "" on initial load from saved project
-          const currentValue = assignment.courseId || '';
-          courseSelect.innerHTML = '<option value="">Select a course</option>';
+    function setCourseFaculty(divisionId, courseId, facultyId) {
+      const existing = findAssignment(divisionId, courseId);
 
-          let currentCourseStillExists = false;
+      if (!facultyId) {                       // "Not taught" — drop the assignment
+        if (existing) assignments.splice(assignments.indexOf(existing), 1);
+      } else if (existing) {
+        existing.facultyId = facultyId;
+      } else {
+        assignments.push({
+          id: uid('assignment'),
+          divisionId, courseId, facultyId,
+          timesPerWeek: courseTimesPerWeek(courseId)
+        });
+      }
+      renderAssignmentMatrix();
+      markDirty();
+    }
 
-          standards.forEach(standard => {
-            standard.courses.forEach(course => {
-              if (!assignedCourseIds.includes(course.id) || course.id === currentValue) {
-                const displayName = `${standard.name} - ${course.name} (${course.courseCode})`;
-                const option = document.createElement('option');
-                option.value = course.id;
-                option.textContent = displayName;
-                if (course.id === currentValue) {
-                  option.selected = true;
-                  currentCourseStillExists = true;
-                }
-                courseSelect.appendChild(option);
-              }
-            });
-          });
+    function setCourseTimesPerWeek(courseId, value) {
+      let tpw = parseInt(value);
+      if (isNaN(tpw) || tpw < 1) tpw = 1;
+      assignments.forEach(a => { if (a.courseId === courseId) a.timesPerWeek = tpw; });
+      renderAssignmentMatrix();
+      markDirty();
+    }
 
-          if (!currentCourseStillExists && currentValue !== '') {
-            assignment.courseId = '';
-          }
-        }
+    function renderAssignmentMatrix() {
+      const host = document.getElementById('assignmentMatrix');
+      if (!host) return;
 
-        if (facultySelect) {
-          // FIX: read from data model, not DOM
-          const currentFacultyValue = assignment.facultyId || '';
-          facultySelect.innerHTML = '<option value="">Select a faculty member</option>';
+      const usable = standards.filter(s => (s.courses || []).length && (s.divisions || []).length);
+      if (usable.length === 0) {
+        host.innerHTML = `<p style="color:var(--muted);font-size:13px;margin:0;">Add a standard with at least one course and division first.</p>`;
+        return;
+      }
+      if (faculty.length === 0) {
+        host.innerHTML = `<p style="color:var(--muted);font-size:13px;margin:0;">Add faculty members first, then assign them to courses here.</p>`;
+        return;
+      }
 
-          const currentFacultyStillExists = faculty.some(f => f.id === currentFacultyValue);
+      host.innerHTML = usable.map(std => {
+        const divisions = std.divisions || [];
 
-          faculty.forEach(fac => {
-            const displayName = `${fac.name} (${fac.facultyCode})`;
-            const option = document.createElement('option');
-            option.value = fac.id;
-            option.textContent = displayName;
-            if (fac.id === currentFacultyValue && currentFacultyStillExists) {
-              option.selected = true;
-            }
-            facultySelect.appendChild(option);
-          });
+        const head = divisions.map(d =>
+          `<th style="min-width:150px;">${esc(std.name)}-${esc(d.label)}</th>`).join('');
 
-          if (!currentFacultyStillExists && currentFacultyValue !== '') {
-            assignment.facultyId = '';
-          }
-        }
-      });
-      // Keep constraint dropdowns in sync with current faculty/courses/rooms
-      if (typeof refreshConstraintDropdowns === 'function') refreshConstraintDropdowns();
+        const rows = (std.courses || []).map(course => {
+          const cells = divisions.map(d => {
+            const current = findAssignment(d.id, course.id);
+            const options = ['<option value="">Not taught</option>'].concat(
+              faculty.map(f => {
+                const label = f.facultyCode ? `${f.name} (${f.facultyCode})` : f.name;
+                return `<option value="${f.id}" ${current && current.facultyId === f.id ? 'selected' : ''}>${esc(label || '(unnamed)')}</option>`;
+              })
+            ).join('');
+            return `<td><select onchange="setCourseFaculty('${d.id}','${course.id}',this.value)">${options}</select></td>`;
+          }).join('');
+
+          return `
+            <tr>
+              <td style="text-align:left;font-weight:600;">${esc(course.name || '(unnamed course)')}
+                ${course.courseCode ? `<span style="font-weight:400;color:var(--muted);"> · ${esc(course.courseCode)}</span>` : ''}
+              </td>
+              <td style="width:110px;">
+                <input type="number" min="1" value="${courseTimesPerWeek(course.id)}"
+                  onchange="setCourseTimesPerWeek('${course.id}', this.value)">
+              </td>
+              ${cells}
+            </tr>`;
+        }).join('');
+
+        return `
+          <div class="result-card">
+            <h4>${esc(std.name || '(unnamed standard)')}</h4>
+            <div class="table-wrapper">
+              <table>
+                <thead><tr><th style="text-align:left;">Course</th><th>Per week</th>${head}</tr></thead>
+                <tbody>${rows}</tbody>
+              </table>
+            </div>
+          </div>`;
+      }).join('');
     }
 
     // Classroom Management
-    function addRoom() {
-      const container = document.getElementById("roomContainer");
-      const cardId = uid('room');
+    /** Re-render every standard's division rows (their room dropdowns list rooms). */
+    function refreshDivisionRoomPickers() {
+      standards.forEach(s => renderStandardDivisions(s.id));
+    }
 
+    function addRoom(name = '') {
+      const roomId = uid('room');
+      classrooms.push({ id: roomId, name });
+      renderRoomCard({ id: roomId, name });
+      refreshDivisionRoomPickers();
+      markDirty();
+      return roomId;
+    }
+
+    function renderRoomCard(room) {
+      const container = document.getElementById('roomContainer');
       const cardDiv = document.createElement('div');
       cardDiv.className = 'card';
-      cardDiv.id = cardId;
+      cardDiv.id = room.id;
       cardDiv.innerHTML = `
         <div class="grid">
-          <div><label>Classroom name</label><input type="text" placeholder="e.g. Room 1"></div>
+          <div><label>Classroom name</label>
+            <input type="text" placeholder="e.g. Room 1" value="${esc(room.name)}"
+              onchange="updateRoom('${room.id}', this.value)"></div>
         </div>
-        <button class="btn-remove" onclick="removeCard('${cardId}')">Remove</button>
+        <button class="btn-remove" onclick="removeRoom('${room.id}')">Remove</button>
       `;
       container.appendChild(cardDiv);
     }
 
-    function removeCard(cardId) {
-      document.getElementById(cardId).remove();
+    function updateRoom(roomId, name) {
+      const room = classrooms.find(r => r.id === roomId);
+      if (!room) return;
+      room.name = name;
+      refreshDivisionRoomPickers();
+      if (typeof refreshConstraintDropdowns === 'function') refreshConstraintDropdowns();
+      markDirty();
+    }
+
+    function removeRoom(roomId) {
+      const idx = classrooms.findIndex(r => r.id === roomId);
+      if (idx === -1) return;
+      document.getElementById(roomId)?.remove();
+      classrooms.splice(idx, 1);
+
+      // A division must never point at a room that no longer exists
+      standards.forEach(std => {
+        (std.divisions || []).forEach(d => {
+          if (d.roomId === roomId) d.roomId = null;
+        });
+      });
+
+      refreshDivisionRoomPickers();
+      if (typeof refreshConstraintDropdowns === 'function') refreshConstraintDropdowns();
+      markDirty();
     }
 
     // Time Slot Management - FIXED
@@ -1309,17 +1533,6 @@
             <select onchange="updateHC('${cid}','timeslot',this.value)">
               ${slotOptionsHtml(c.timeslot)}
             </select></div>`;
-      } else if (c.type === 'room_restriction') {
-        const roomOpts = getClassrooms().map(r => `<option value="${r}" ${r === c.classroom ? 'selected' : ''}>${esc(r)}</option>`).join('');
-        fieldsHtml = `
-          <div><label>Course</label>
-            <select onchange="updateHC('${cid}','courseId',this.value)">
-              <option value="">Select a course</option>${courseOptionsHtml(c.courseId)}
-            </select></div>
-          <div><label>Must Use Classroom</label>
-            <select onchange="updateHC('${cid}','classroom',this.value)">
-              <option value="">Select a room</option>${roomOpts}
-            </select></div>`;
       } else if (c.type === 'faculty_first_half_only') {
         fieldsHtml = `
           <div><label>Faculty (only available before break)</label>
@@ -1341,7 +1554,6 @@
           <label style="margin:0;white-space:nowrap;">Constraint Type</label>
           <select style="flex:1;min-width:220px;" onchange="updateHCType('${cid}',this.value)">
             <option value="faculty_unavailability"   ${c.type==='faculty_unavailability'?'selected':''}>Faculty Unavailability</option>
-            <option value="room_restriction"         ${c.type==='room_restriction'?'selected':''}>Room Restriction for Course</option>
             <option value="faculty_first_half_only"  ${c.type==='faculty_first_half_only'?'selected':''}>Faculty Available First Half Only</option>
             <option value="faculty_second_half_only" ${c.type==='faculty_second_half_only'?'selected':''}>Faculty Available Second Half Only</option>
           </select>
@@ -1876,17 +2088,18 @@
         showAlert('Every assignment needs both a course and a faculty selected — remove or complete any incomplete assignments', 'error');
         return;
       }
-      const classrooms = getClassrooms();
-      if (classrooms.length === 0) { showAlert('Please add at least one classroom', 'error'); return; }
-      const dupRoom = classrooms.find((r, i) => classrooms.findIndex(r2 => r2.trim().toLowerCase() === r.trim().toLowerCase()) !== i);
-      if (dupRoom) { showAlert(`Duplicate classroom "${dupRoom}" — classroom names must be unique`, 'error'); return; }
+      const rooms = getClassrooms();
+      if (rooms.length === 0) { showAlert('Please add at least one classroom', 'error'); return; }
+      const roomNames = rooms.map(r => r.name.trim().toLowerCase());
+      const dupIdx = roomNames.findIndex((n, i) => roomNames.indexOf(n) !== i);
+      if (dupIdx !== -1) { showAlert(`Duplicate classroom "${rooms[dupIdx].name}" — classroom names must be unique`, 'error'); return; }
       if (selectedDays.length === 0) { showAlert('Please select at least one day', 'error'); return; }
       const slots = collectTimeSlots();
       if (slots.length === 0) { showAlert('Please add at least one time slot', 'error'); return; }
 
-      if (genBtn) { genBtn.disabled = true; genBtn.style.opacity = '0.6'; genBtn.style.cursor = 'not-allowed'; }
-      document.getElementById('loadingIndicator').classList.add('active');
+      setGeneratingUi(true);
       document.getElementById('outputSection').style.display = 'none';
+      document.getElementById('slowPanel').style.display = 'none';
 
       try {
         const response = await authFetch(`${API_BASE_URL}/api/generate-timetable`, {
@@ -1894,7 +2107,7 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             projectId: PROJ_ID,
-            standards, faculty, assignments, classrooms,
+            standards, faculty, assignments, classrooms: rooms,
             daysOfWeek: selectedDays,
             timeSlots: slots,
             hardConstraints, softConstraints,
@@ -1905,7 +2118,7 @@
         const data = await response.json();
 
         if (!response.ok) {
-          // Impossible timetable — show dedicated panel
+          // Provably impossible — never even starts the search
           if (data.impossible && data.reasons && data.reasons.length) {
             showImpossiblePanel(data.reasons);
             return;
@@ -1916,34 +2129,381 @@
           throw new Error(msg);
         }
 
-        generatedFilename   = data.filename;
-        currentScheduleData = data.data;
-
-        document.getElementById('conflictCount').textContent = data.stats.conflicts;
-        document.getElementById('fitnessScore').textContent  = data.stats.fitness;
-        document.getElementById('classCount').textContent    = data.stats.classCount;
-
-        // Render soft constraint report
-        renderSoftReport(data.stats.softReport || [], data.stats.conflicts);
-
-        // Render hard constraint status
-        renderHardStatus(data.stats.conflicts);
-
-        createPreviewTable(data.data);
-        createStandardTimetables(data.data);
-        populateFacultyTimetableDropdown();
-
-        document.getElementById('outputSection').style.display = 'block';
-        document.getElementById('impossiblePanel')?.remove();
-        showAlert('Schedule generated successfully', 'success');
+        activeJobId = data.jobId;
+        await pollJob(data.jobId);
 
       } catch (error) {
         showAlert('Error: ' + error.message, 'error');
         console.error(error);
       } finally {
-        document.getElementById('loadingIndicator').classList.remove('active');
-        if (genBtn) { genBtn.disabled = false; genBtn.style.opacity = ''; genBtn.style.cursor = ''; }
+        setGeneratingUi(false);
       }
+    }
+
+    // ── Generation job: progress, escalation, cancellation ───────────────
+    let activeJobId = null;
+    let jobStartedAt = 0;
+
+    function setGeneratingUi(running) {
+      const genBtn = document.getElementById('generateBtn');
+      document.getElementById('loadingIndicator').classList.toggle('active', running);
+      if (genBtn) {
+        genBtn.disabled = running;
+        genBtn.style.opacity = running ? '0.6' : '';
+        genBtn.style.cursor  = running ? 'not-allowed' : '';
+      }
+      if (running) {
+        jobStartedAt = Date.now();
+        document.getElementById('loadingHeadline').textContent = 'Generating your schedule, please wait…';
+        document.getElementById('generationCount').textContent = '';
+      } else {
+        activeJobId = null;
+      }
+    }
+
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+    async function pollJob(jobId, { improve = false } = {}) {
+      while (true) {
+        await sleep(600);
+        if (activeJobId !== jobId) return;   // cancelled
+
+        const res  = await authFetch(`${API_BASE_URL}/api/jobs/${jobId}`);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Lost track of the generation job.');
+
+        if (data.status === 'running') { updateRunProgress(data, improve); continue; }
+        if (data.status === 'cancelled') return;
+        if (data.status === 'error') throw new Error(data.error || 'Generation failed.');
+
+        if (data.status === 'done') {
+          document.getElementById('slowPanel').style.display = 'none';
+          if (improve) applyImprovedSchedule(data);
+          else         applyGeneratedSchedule(data);
+          return;
+        }
+      }
+    }
+
+    function updateRunProgress(data, improve = false) {
+      const secs = Math.floor(data.elapsedMs / 1000);
+      const p    = data.progress || {};
+      const bits = [];
+      if (p.totalGenerations) bits.push(`generation ${p.totalGenerations.toLocaleString()}`);
+      if (improve) {
+        // Hard constraints are already met here — the number that matters is the
+        // soft penalty coming down, not clashes.
+        if (p.softPenalty !== undefined && p.softPenalty !== null) bits.push(`preference score ${p.softPenalty}`);
+      } else if (p.conflicts !== null && p.conflicts !== undefined) {
+        bits.push(`${p.conflicts} clash${p.conflicts === 1 ? '' : 'es'} left`);
+      }
+      bits.push(`${secs}s`);
+      document.getElementById('generationCount').textContent = bits.join(' · ');
+
+      if (improve) return;   // an improve run is bounded; no stagnation advice needed
+
+      // Escalate: quiet for the first minute, advice after one, firmer after two.
+      const headline = document.getElementById('loadingHeadline');
+      if (secs >= 120) {
+        headline.textContent = 'This is taking much longer than expected.';
+        showSlowPanel(data.diagnostics, 'severe');
+      } else if (secs >= 60) {
+        headline.textContent = 'Taking longer than usual…';
+        showSlowPanel(data.diagnostics, 'warn');
+      }
+    }
+
+    /** Advice shown during a slow run — deliberately left on screen after Cancel. */
+    function showSlowPanel(diagnostics, level) {
+      const panel = document.getElementById('slowPanel');
+      if (!diagnostics) return;
+      if (panel.dataset.level === level) return;   // already rendered at this level
+      panel.dataset.level = level;
+
+      const severe = level === 'severe';
+      const tight = (diagnostics.tight || []).map(t =>
+        `<li style="margin-bottom:4px;"><strong>${esc(t.name)}</strong> — ${t.used} of ${t.capacity} periods used (${t.percent}%)</li>`).join('');
+
+      panel.style.cssText = `background:var(--${severe ? 'danger' : 'warning'}-soft);border:1px solid var(--${severe ? 'danger' : 'warning'}-border);border-radius:var(--radius);padding:18px;margin:18px 0;`;
+      panel.innerHTML = `
+        <h3 style="color:var(--${severe ? 'danger' : 'warning'});margin:0 0 8px 0;font-size:15px;">
+          ${severe ? 'Still searching — this schedule looks very tight' : 'This is taking longer than usual'}
+        </h3>
+        <p style="color:var(--text-secondary);font-size:13px;margin:0 0 12px 0;line-height:1.6;">
+          ${severe
+            ? 'The scheduler will keep trying for as long as you let it, but these inputs leave it very little room. Consider the changes below, then cancel and generate again.'
+            : 'The scheduler is still working. You can let it continue, or apply one of these changes and try again.'}
+        </p>
+        ${tight ? `<p style="font-size:12px;font-weight:600;color:var(--text);margin:0 0 6px 0;">Under most pressure</p>
+        <ul style="margin:0 0 12px 0;padding-left:20px;font-size:13px;color:var(--text-secondary);line-height:1.5;">${tight}</ul>` : ''}
+        <p style="font-size:12px;font-weight:600;color:var(--text);margin:0 0 6px 0;">Suggested changes</p>
+        <ul style="margin:0;padding-left:20px;font-size:13px;color:var(--text-secondary);line-height:1.6;">
+          ${(diagnostics.suggestions || []).map(s => `<li style="margin-bottom:5px;">${esc(s)}</li>`).join('')}
+        </ul>`;
+      panel.style.display = 'block';
+    }
+
+    async function cancelGeneration() {
+      if (!activeJobId) return;
+      const jobId = activeJobId;
+      activeJobId = null;                     // stops the poll loop
+      setGeneratingUi(false);
+      try { await authFetch(`${API_BASE_URL}/api/jobs/${jobId}`, { method: 'DELETE' }); } catch {}
+      // The advice panel deliberately stays up so it can be acted on.
+      showAlert('Generation cancelled.', 'info');
+    }
+
+    function applyGeneratedSchedule(data, { announce = true } = {}) {
+      generatedFilename    = data.filename;
+      currentScheduleData  = data.data;
+      currentSolutionGenes = data.genes || currentSolutionGenes;
+      currentStats         = data.stats;
+
+      document.getElementById('conflictCount').textContent = data.stats.conflicts;
+      document.getElementById('fitnessScore').textContent  = data.stats.fitness;
+      document.getElementById('classCount').textContent    = data.stats.classCount;
+
+      renderSoftReport(data.stats.softReport || [], data.stats.conflicts);
+      renderHardStatus(data.stats.conflicts);
+
+      createPreviewTable(data.data);
+      createStandardTimetables(data.data);
+      populateFacultyTimetableDropdown();
+      renderPreferenceSummary(data.stats);
+
+      document.getElementById('outputSection').style.display = 'block';
+      document.getElementById('impossiblePanel')?.remove();
+      if (announce) showAlert('Schedule generated successfully', 'success');
+    }
+
+    // ── Demo data ───────────────────────────────────────────────────────
+    function projectHasData() {
+      return standards.length > 0 || faculty.length > 0 || classrooms.length > 0 ||
+             assignments.length > 0 || hardConstraints.length > 0 || softConstraints.length > 0;
+    }
+
+    async function fillDemoData() {
+      if (projectHasData() &&
+          !confirm('This will replace everything currently in this project — standards, teachers, classrooms, assignments and constraints. Continue?')) {
+        return;
+      }
+
+      const btn = document.getElementById('demoBtn');
+      btn.disabled = true;
+      const originalLabel = btn.textContent;
+      btn.textContent = 'Loading sample school…';
+
+      try {
+        const res  = await authFetch(`${API_BASE_URL}/api/demo-data`);
+        const body = await res.json();
+        if (!res.ok || !body.success) throw new Error(body.error || 'Could not load the demo data.');
+        const d = body.data;
+
+        // Replace the in-memory model wholesale, then rebuild the UI from it
+        standards       = d.standards;
+        faculty         = d.faculty;
+        assignments     = d.assignments;
+        classrooms      = d.classrooms;
+        selectedDays    = d.selectedDays;
+        timeSlotValues  = d.timeSlotValues;
+        hardConstraints = d.hardConstraints;
+        softConstraints = d.softConstraints;
+        breakTime       = d.breakTime;
+
+        generatedFilename = null; currentScheduleData = null;
+        currentSolutionGenes = null; currentStats = null; previousResult = null;
+
+        document.getElementById('standardsContainer').innerHTML = '';
+        document.getElementById('facultyContainer').innerHTML   = '';
+        document.getElementById('roomContainer').innerHTML      = '';
+        document.getElementById('hardConstraintsContainer').innerHTML = '';
+        document.getElementById('softConstraintsContainer').innerHTML = '';
+        document.getElementById('outputSection').style.display = 'none';
+        document.getElementById('preferencesBlock').style.display = 'none';
+        document.getElementById('slowPanel').style.display = 'none';
+        document.getElementById('impossiblePanel')?.remove();
+
+        classrooms.forEach(renderRoomCard);
+        standards.forEach(renderStandardCard);
+        faculty.forEach(fac => renderFacultyCard(fac));
+        document.querySelectorAll('#daysCheckboxes input[type="checkbox"]').forEach(cb => {
+          cb.checked = selectedDays.includes(cb.value);
+        });
+        renderTimeSlots();
+        document.getElementById('breakStartInput').value = breakTime.start || '';
+        document.getElementById('breakEndInput').value   = breakTime.end   || '';
+        hardConstraints.forEach(c => renderHardConstraintCard(c.id, document.getElementById('hardConstraintsContainer')));
+        softConstraints.forEach(c => renderSoftConstraintCard(c.id, document.getElementById('softConstraintsContainer')));
+        renderAssignmentMatrix();
+
+        markDirty();
+        showAlert(`Sample school loaded — ${standards.length} standards, ${allDivisions().length} divisions, ${faculty.length} teachers. Scroll down and press "Generate schedule".`, 'success');
+        document.getElementById('generateBtn').scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+      } catch (err) {
+        showAlert('Error: ' + err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+      }
+    }
+
+    // ── Preferences / improve ───────────────────────────────────────────
+    let currentSolutionGenes = null;
+    let currentStats         = null;
+    let previousResult       = null;   // snapshot to fall back to after an improve
+
+    function softScoreText(stats) {
+      if (!stats || !stats.softTotal) return 'No soft constraints defined — nothing to optimise.';
+      return `${stats.softMet} of ${stats.softTotal} preference${stats.softTotal === 1 ? '' : 's'} met.`;
+    }
+
+    function renderPreferenceSummary(stats) {
+      const block = document.getElementById('preferencesBlock');
+      const hasSoft = stats && stats.softTotal > 0;
+      block.style.display = 'block';
+
+      const penalty = stats && stats.softPenalty;
+      const scoreBit = (penalty !== undefined && penalty !== null)
+        ? ` Preference score ${penalty} (lower is better).` : '';
+
+      document.getElementById('preferenceSummary').textContent = hasSoft
+        ? `${softScoreText(stats)}${scoreBit} Hard constraints are fully satisfied — you can spend more time trying to do better on preferences.`
+        : 'No soft constraints defined. Add some above if you want the scheduler to optimise for preferences.';
+
+      // Offer improvement whenever there is any penalty left, not only when a
+      // preference is fully unmet — a run can cut the penalty substantially
+      // without flipping any single constraint to "satisfied".
+      const roomToImprove = penalty === undefined || penalty === null
+        ? stats.softMet < stats.softTotal
+        : penalty > 0;
+      document.getElementById('improveBtn').style.display = hasSoft && roomToImprove ? 'inline-block' : 'none';
+      document.getElementById('improveComparison').innerHTML = '';
+    }
+
+    async function improveSchedule() {
+      if (!currentSolutionGenes) { showAlert('Generate a schedule first', 'error'); return; }
+      const improveBtn = document.getElementById('improveBtn');
+      if (improveBtn.disabled) return;
+
+      // Snapshot so the user can go back if they prefer the original
+      previousResult = {
+        filename: generatedFilename,
+        data: currentScheduleData,
+        genes: currentSolutionGenes,
+        stats: currentStats
+      };
+
+      improveBtn.disabled = true;
+      setGeneratingUi(true);
+      document.getElementById('loadingHeadline').textContent = 'Looking for a schedule that meets more preferences…';
+
+      try {
+        const res = await authFetch(`${API_BASE_URL}/api/improve-timetable`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            projectId: PROJ_ID,
+            genes: currentSolutionGenes,
+            standards, faculty, assignments, classrooms: getClassrooms(),
+            daysOfWeek: selectedDays, timeSlots: collectTimeSlots(),
+            hardConstraints, softConstraints, breakTime
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Could not start the improvement run.');
+
+        activeJobId = data.jobId;
+        await pollJob(data.jobId, { improve: true });
+
+      } catch (err) {
+        showAlert('Error: ' + err.message, 'error');
+      } finally {
+        setGeneratingUi(false);
+        improveBtn.disabled = false;
+      }
+    }
+
+    function applyImprovedSchedule(data) {
+      const before = previousResult.stats;
+      const after  = data.stats;
+
+      applyGeneratedSchedule(data, { announce: false });
+
+      const panel = document.getElementById('improveComparison');
+
+      // The penalty is the real quality measure. "Preferences met" only flips
+      // when a constraint reaches zero violations, so a run can cut the penalty
+      // a long way without changing it — judging by met-count alone would throw
+      // a genuinely better schedule away.
+      const beforePenalty = before.softPenalty;
+      const afterPenalty  = after.softPenalty;
+      const havePenalty   = Number.isFinite(beforePenalty) && Number.isFinite(afterPenalty);
+      const better = havePenalty ? afterPenalty < beforePenalty
+                                 : (after.softMet || 0) > (before.softMet || 0);
+
+      if (!better) {
+        panel.innerHTML = `
+          <div style="margin-top:14px;padding:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);">
+            <p style="margin:0;font-size:13px;color:var(--text-secondary);">
+              No further improvement found — the previous schedule was already the best this search could reach
+              (${softScoreText(before)}). Your schedule is unchanged.
+            </p>
+          </div>`;
+        keepPreviousSchedule({ silent: true });
+        return;
+      }
+
+      const pct = havePenalty && beforePenalty > 0
+        ? Math.round(((beforePenalty - afterPenalty) / beforePenalty) * 100) : null;
+
+      const metLine = (after.softMet || 0) > (before.softMet || 0)
+        ? `<li>Preferences fully met: <strong>${before.softMet} of ${before.softTotal}</strong> → <strong>${after.softMet} of ${after.softTotal}</strong></li>`
+        : `<li>Preferences fully met: unchanged at <strong>${after.softMet} of ${after.softTotal}</strong> — but the remaining ones are broken less often</li>`;
+
+      panel.innerHTML = `
+        <div style="margin-top:14px;padding:16px;background:var(--success-soft);border:1px solid var(--success-border);border-radius:var(--radius);">
+          <h4 style="margin:0 0 8px 0;font-size:14px;color:var(--success);">A better schedule was found</h4>
+          <ul style="margin:0 0 12px 0;padding-left:20px;font-size:13px;color:var(--text-secondary);line-height:1.6;">
+            ${havePenalty ? `<li>Preference score: <strong>${beforePenalty}</strong> → <strong>${afterPenalty}</strong>${pct !== null ? ` (${pct}% better)` : ''}</li>` : ''}
+            ${metLine}
+            <li>Hard constraints: still fully satisfied</li>
+          </ul>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="btn-secondary" style="margin-right:0;" onclick="keepImprovedSchedule()">Keep the new one</button>
+            <button class="btn-secondary" style="margin-right:0;" onclick="keepPreviousSchedule()">Keep the previous one</button>
+          </div>
+        </div>`;
+    }
+
+    function keepImprovedSchedule() {
+      previousResult = null;
+      document.getElementById('improveComparison').innerHTML = '';
+      renderPreferenceSummary(currentStats);
+      showAlert('Improved schedule kept.', 'success');
+    }
+
+    async function keepPreviousSchedule({ silent = false } = {}) {
+      if (!previousResult) return;
+      const restore = previousResult;
+      previousResult = null;
+      applyGeneratedSchedule(restore, { announce: false });
+
+      // Put the original back on the server too, so downloads and reloads match
+      if (PROJ_ID) {
+        try {
+          await authFetch(`${API_BASE_URL}/api/projects/${PROJ_ID}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              scheduleData: restore.data,
+              scheduleStats: restore.stats,
+              generatedFilename: restore.filename
+            })
+          });
+        } catch {}
+      }
+      if (!silent) showAlert('Kept the previous schedule.', 'info');
     }
 
     function showImpossiblePanel(reasons) {
@@ -1986,7 +2546,6 @@
       }
       const typeLabels = {
         faculty_unavailability:  'Faculty Unavailability',
-        room_restriction:        'Room Restriction',
         faculty_first_half_only: 'Faculty First Half Only'
       };
       el.innerHTML = hardConstraints.map(hc => {
@@ -2109,7 +2668,7 @@
 
     function resetForm() {
       if (confirm('Reset the entire form?')) {
-        standards = []; faculty = []; assignments = []; selectedDays = [];
+        standards = []; faculty = []; assignments = []; classrooms = []; selectedDays = [];
         generatedFilename = null; timeSlotValues = [{ startTime: '', endTime: '' }];
         hardConstraints = []; softConstraints = [];
         breakTime = { start: '', end: '' };
@@ -2118,11 +2677,11 @@
         document.getElementById('standardsContainer').innerHTML  = '';
         document.getElementById('facultyContainer').innerHTML    = '';
         document.getElementById('roomContainer').innerHTML       = '';
-        document.getElementById('assignmentContainer').innerHTML = '';
         document.getElementById('hardConstraintsContainer').innerHTML = '';
         document.getElementById('softConstraintsContainer').innerHTML = '';
         document.querySelectorAll('#daysCheckboxes input').forEach(cb => cb.checked = false);
         renderTimeSlots();
+        renderAssignmentMatrix();
         document.getElementById('outputSection').style.display = 'none';
         document.getElementById('impossiblePanel')?.remove();
         showAlert('Form cleared', 'info');
@@ -2151,78 +2710,27 @@
         document.getElementById('projectBarName').textContent = p.name;
         document.title = p.name + ' · Schedura';
 
-        // Standards & Courses
-        (p.standards||[]).forEach(std => {
-          standards.push({ id: std.id, name: std.name, courses: [] });
-          const standardEntry = standards[standards.length - 1];
-          const container = document.getElementById('standardsContainer');
-          const card = document.createElement('div');
-          card.className = 'card'; card.id = std.id;
-          card.innerHTML = `
-            <div>
-              <label>Standard name</label>
-              <input type="text" value="${esc(std.name)}" placeholder="e.g. 8-A" onchange="updateStandardName('${std.id}', this.value)">
-            </div>
-            <div style="margin-top:15px;">
-              <p style="margin:0 0 8px 0;font-weight:600;font-size:13px;color:var(--text);">Courses</p>
-              <div id="${std.id}-courses"></div>
-              <button class="btn-add" style="margin-top:10px;" onclick="addCourse('${std.id}')">+ Add course</button>
-            </div>
-            <button class="btn-remove" onclick="removeStandard('${std.id}')">Remove standard</button>`;
-          container.appendChild(card);
+        // Classrooms first — divisions reference rooms by id
+        (p.classrooms||[]).forEach(room => {
+          classrooms.push({ id: room.id, name: room.name });
+          renderRoomCard(room);
+        });
 
-          (std.courses||[]).forEach(course => {
-            standardEntry.courses.push({ id: course.id, name: course.name, courseCode: course.courseCode });
-            const cc = document.getElementById(`${std.id}-courses`);
-            const sub = document.createElement('div');
-            sub.className = 'sub-card'; sub.id = course.id;
-            sub.innerHTML = `
-              <div class="sub-card-grid">
-                <div><label>Course name</label>
-                  <input type="text" value="${esc(course.name)}" placeholder="e.g. Mathematics"
-                    onchange="updateCourseName('${std.id}','${course.id}','name',this.value)"></div>
-                <div><label>Course code</label>
-                  <input type="text" value="${esc(course.courseCode)}" placeholder="e.g. MATH101"
-                    onchange="updateCourseName('${std.id}','${course.id}','courseCode',this.value)"></div>
-              </div>
-              <button class="btn-remove" style="font-size:11px;padding:4px 8px;"
-                onclick="removeCourse('${course.id}','${std.id}')">Remove course</button>`;
-            cc.appendChild(sub);
+        // Standards, divisions & courses — same renderer the add buttons use
+        (p.standards||[]).forEach(std => {
+          standards.push({
+            id: std.id,
+            name: std.name,
+            courses: (std.courses || []).map(c => ({ id: c.id, name: c.name, courseCode: c.courseCode })),
+            divisions: (std.divisions || []).map(d => ({ id: d.id, label: d.label, roomId: d.roomId ?? null }))
           });
+          renderStandardCard(standards[standards.length - 1]);
         });
 
         // Faculty
         (p.faculty||[]).forEach(fac => {
           faculty.push({ id: fac.id, name: fac.name, facultyCode: fac.facultyCode });
-          const container = document.getElementById('facultyContainer');
-          const card = document.createElement('div');
-          card.className = 'card'; card.id = fac.id;
-          card.innerHTML = `
-            <div class="grid">
-              <div><label>Faculty name</label>
-                <input type="text" value="${esc(fac.name)}" placeholder="Full name"
-                  onchange="updateFaculty('${fac.id}','name',this.value)"></div>
-              <div><label>Faculty code</label>
-                <input type="text" value="${esc(fac.facultyCode)}" placeholder="e.g. FAC01"
-                  onchange="updateFaculty('${fac.id}','facultyCode',this.value)"></div>
-            </div>
-            <button class="btn-remove" onclick="removeFaculty('${fac.id}')">Remove</button>`;
-          container.appendChild(card);
-        });
-
-        // Classrooms
-        (p.classrooms||[]).forEach(room => {
-          const cid = uid('room');
-          const container = document.getElementById('roomContainer');
-          const card = document.createElement('div');
-          card.className = 'card'; card.id = cid;
-          card.innerHTML = `
-            <div class="grid">
-              <div><label>Classroom name</label>
-                <input type="text" value="${esc(room)}" placeholder="e.g. Room 1" onchange="markDirty()"></div>
-            </div>
-            <button class="btn-remove" onclick="removeCard('${cid}')">Remove</button>`;
-          container.appendChild(card);
+          renderFacultyCard(faculty[faculty.length - 1]);
         });
 
         // Days
@@ -2241,26 +2749,12 @@
 
         // Assignments (must be after standards + faculty)
         (p.assignments||[]).forEach(asgn => {
-          assignments.push({ id: asgn.id, courseId: asgn.courseId, facultyId: asgn.facultyId, timesPerWeek: asgn.timesPerWeek });
-          const container = document.getElementById('assignmentContainer');
-          const card = document.createElement('div');
-          card.className = 'card'; card.id = asgn.id;
-          card.innerHTML = `
-            <div class="grid">
-              <div><label>Course</label>
-                <select id="${asgn.id}-course" onchange="updateAssignment('${asgn.id}','courseId',this.value)">
-                  <option value="">Select a course</option></select></div>
-              <div><label>Faculty</label>
-                <select id="${asgn.id}-faculty" onchange="updateAssignment('${asgn.id}','facultyId',this.value)">
-                  <option value="">Select a faculty member</option></select></div>
-              <div><label>Times per week</label>
-                <input type="number" min="1" value="${asgn.timesPerWeek||1}"
-                  onchange="updateAssignment('${asgn.id}','timesPerWeek',parseInt(this.value))"></div>
-            </div>
-            <button class="btn-remove" onclick="removeAssignment('${asgn.id}')">Remove</button>`;
-          container.appendChild(card);
+          assignments.push({
+            id: asgn.id, divisionId: asgn.divisionId ?? null,
+            courseId: asgn.courseId, facultyId: asgn.facultyId, timesPerWeek: asgn.timesPerWeek
+          });
         });
-        updateAssignmentDropdowns(); // populate selects with saved values
+        renderAssignmentMatrix();
 
         // Break time
         if (p.breakTime) {
@@ -2283,14 +2777,17 @@
 
         // Restore generated timetable output
         if (p.scheduleData) {
-          generatedFilename   = p.generatedFilename;
-          currentScheduleData = p.scheduleData;
+          generatedFilename    = p.generatedFilename;
+          currentScheduleData  = p.scheduleData;
+          currentSolutionGenes = p.scheduleGenes || null;  // lets Improve reseed after a reload
+          currentStats         = p.scheduleStats || null;
           if (p.scheduleStats) {
             document.getElementById('conflictCount').textContent = p.scheduleStats.conflicts;
             document.getElementById('fitnessScore').textContent  = p.scheduleStats.fitness;
             document.getElementById('classCount').textContent    = p.scheduleStats.classCount;
             renderSoftReport(p.scheduleStats.softReport || [], p.scheduleStats.conflicts);
             renderHardStatus(p.scheduleStats.conflicts);
+            renderPreferenceSummary(p.scheduleStats);
           }
           createPreviewTable(p.scheduleData);
           createStandardTimetables(p.scheduleData);
@@ -2303,9 +2800,8 @@
       }
     }
 
-    
     // Initial setup
-    loadProjectData();
+    loadProjectData().finally(renderAssignmentMatrix);
   </script>
 </body>
 

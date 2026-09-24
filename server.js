@@ -6,8 +6,9 @@ const ExcelJS  = require('exceljs');
 const path     = require('path');
 const fs       = require('fs');
 const jwt      = require('jsonwebtoken');
+const { Worker } = require('worker_threads');
 const { OAuth2Client } = require('google-auth-library');
-const GeneticAlgorithm = require('./ga');
+const { buildDemoSchool } = require('./demo-data');
 
 const app  = express();
 const PORT = process.env.PORT || 5000;
@@ -65,6 +66,96 @@ function loadUserProjects(email) {
 function saveUserProjects(email, projects) {
   const file = userProjectsFile(email);
   fs.writeFileSync(file, JSON.stringify(projects, null, 2));
+}
+
+// ─────────────────────────────────────────────
+// SCHEMA HELPERS / MIGRATION
+// ─────────────────────────────────────────────
+
+/** Collision-resistant id (Date.now() alone collides within the same millisecond) */
+function uid(prefix) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/** Classroom names, in order — for code that still works with plain names. */
+function classroomNames(classrooms) {
+  return (classrooms || []).map(r => (typeof r === 'string' ? r : (r && r.name) || ''));
+}
+
+/**
+ * Bring a project up to the current schema, in place.
+ *
+ * v1 → v2 changes:
+ *   - classrooms: ["Room 1"]        → [{ id, name }]
+ *   - standards:  gain `divisions`  → [{ id, label, roomId }]  (one "A" per standard)
+ *   - assignments: gain `divisionId` (pointed at its standard's only division)
+ *   - hardConstraints: `room_restriction` dropped — every class now sits in its
+ *     division's own room, so a per-course room rule can no longer be honoured.
+ *
+ * Returns true when something was rewritten, so the caller can persist it.
+ */
+function migrateProject(project) {
+  let changed = false;
+
+  // ── classrooms → objects ──
+  if (Array.isArray(project.classrooms)) {
+    project.classrooms = project.classrooms.map(room => {
+      if (typeof room === 'string') {
+        changed = true;
+        return { id: uid('room'), name: room };
+      }
+      if (room && !room.id) { changed = true; return { id: uid('room'), name: room.name || '' }; }
+      return room;
+    });
+  } else if (project.classrooms === undefined) {
+    project.classrooms = [];
+  }
+
+  // ── standards gain divisions; each division claims a distinct room ──
+  const takenRoomIds = new Set(
+    (project.standards || []).flatMap(s => (s.divisions || []).map(d => d.roomId)).filter(Boolean)
+  );
+  const freeRoom = () => {
+    const room = (project.classrooms || []).find(r => !takenRoomIds.has(r.id));
+    if (room) takenRoomIds.add(room.id);
+    return room ? room.id : null;
+  };
+
+  (project.standards || []).forEach(std => {
+    if (!Array.isArray(std.divisions) || std.divisions.length === 0) {
+      changed = true;
+      std.divisions = [{ id: uid('div'), label: 'A', roomId: freeRoom() }];
+    }
+  });
+
+  // ── assignments gain divisionId (resolved via the course's owning standard) ──
+  if (Array.isArray(project.assignments)) {
+    const divisionForCourse = {};
+    (project.standards || []).forEach(std => {
+      const firstDivision = (std.divisions || [])[0];
+      (std.courses || []).forEach(c => {
+        if (firstDivision) divisionForCourse[c.id] = firstDivision.id;
+      });
+    });
+
+    project.assignments.forEach(a => {
+      if (!a.divisionId) {
+        const divisionId = divisionForCourse[a.courseId];
+        if (divisionId) { a.divisionId = divisionId; changed = true; }
+      }
+    });
+  }
+
+  // ── drop the now-meaningless room_restriction rules ──
+  if (Array.isArray(project.hardConstraints)) {
+    const kept = project.hardConstraints.filter(hc => hc.type !== 'room_restriction');
+    if (kept.length !== project.hardConstraints.length) {
+      project.hardConstraints = kept;
+      changed = true;
+    }
+  }
+
+  return changed;
 }
 
 // ─────────────────────────────────────────────
@@ -179,6 +270,14 @@ app.get('/api/projects/:id', requireAuth, (req, res) => {
   const projects = loadUserProjects(req.user.email);
   const project  = projects.find(p => p.id === req.params.id);
   if (!project) return res.status(404).json({ success: false, error: 'Project not found.' });
+
+  // Older projects predate divisions / classroom objects — upgrade on read so the
+  // client only ever deals with the current shape, and persist it once.
+  if (migrateProject(project)) {
+    saveUserProjects(req.user.email, projects);
+    console.log(`↻ Migrated project "${project.name}" to the divisions schema`);
+  }
+
   res.json({ success: true, project });
 });
 
@@ -241,10 +340,29 @@ app.put('/api/projects/:id', requireAuth, (req, res) => {
     const dupCCode = allCourseCodes.find((c, i) => allCourseCodes.indexOf(c) !== i);
     if (dupCId)   return res.status(400).json({ success: false, error: `Duplicate course ID "${dupCId}" — course IDs must be unique.` });
     if (dupCCode) return res.status(400).json({ success: false, error: `Duplicate course code — course codes must be unique.` });
+
+    // Divisions: ids unique across the whole project, and one room serves one division
+    const divIds = body.standards.flatMap(s => (s.divisions||[]).map(d => d.id)).filter(Boolean);
+    const dupDiv = divIds.find((id, i) => divIds.indexOf(id) !== i);
+    if (dupDiv) return res.status(400).json({ success: false, error: `Duplicate division ID "${dupDiv}".` });
+
+    const roomIds = body.standards.flatMap(s => (s.divisions||[]).map(d => d.roomId)).filter(Boolean);
+    const dupRoomUse = roomIds.find((id, i) => roomIds.indexOf(id) !== i);
+    if (dupRoomUse) {
+      const roomName = (body.classrooms || []).find(r => r && r.id === dupRoomUse);
+      return res.status(400).json({
+        success: false,
+        error: `Classroom "${roomName ? roomName.name : dupRoomUse}" is assigned to more than one division — each division needs its own room.`
+      });
+    }
   }
 
   if (body.classrooms && Array.isArray(body.classrooms)) {
-    const names = body.classrooms.map(r => (r||'').trim().toUpperCase()).filter(Boolean);
+    const ids = body.classrooms.map(r => r && r.id).filter(Boolean);
+    const dupId = ids.find((id, i) => ids.indexOf(id) !== i);
+    if (dupId) return res.status(400).json({ success: false, error: `Duplicate classroom ID "${dupId}".` });
+
+    const names = classroomNames(body.classrooms).map(n => n.trim().toUpperCase()).filter(Boolean);
     const dupRoom = names.find((n, i) => names.indexOf(n) !== i);
     if (dupRoom) return res.status(400).json({ success: false, error: `Duplicate classroom "${dupRoom}" — classroom names must be unique.` });
   }
@@ -277,19 +395,184 @@ app.delete('/api/projects/:id', requireAuth, (req, res) => {
   res.json({ success: true });
 });
 
+// ─────────────────────────────────────────────
+// GENERATION JOBS
+// ─────────────────────────────────────────────
+//
+// The GA has no time limit by design, so it cannot run inside the request. Each
+// run becomes a job on a worker thread: the client starts it, polls progress,
+// and can cancel — all of which are impossible while the main thread is blocked.
+
+const jobs = new Map();          // jobId -> job
+const JOB_RETENTION_MS = 10 * 60 * 1000;
+
+function pruneJobs() {
+  const now = Date.now();
+  for (const [id, job] of jobs) {
+    if (job.status !== 'running' && now - job.finishedAt > JOB_RETENTION_MS) jobs.delete(id);
+  }
+}
+
+/**
+ * Where the schedule is under pressure. Computed from the inputs alone, so it
+ * is available even while the GA is still searching — this is what the UI shows
+ * once a run starts taking a long time.
+ */
+function buildDiagnostics(data) {
+  const { standards = [], faculty = [], assignments = [], daysOfWeek = [], timeSlots = [], hardConstraints = [], breakTime } = data;
+  const slotsPerWeek = daysOfWeek.length * timeSlots.length;
+  if (!slotsPerWeek) return { tight: [], suggestions: [] };
+
+  const firstHalfCount = breakTime && breakTime.start
+    ? timeSlots.filter(s => s.startTime < breakTime.start).length
+    : timeSlots.length;
+
+  const halfOnly = new Map();
+  const blocked  = {};
+  hardConstraints.forEach(hc => {
+    if (hc.type === 'faculty_first_half_only')  halfOnly.set(hc.facultyId, 'first');
+    if (hc.type === 'faculty_second_half_only') halfOnly.set(hc.facultyId, 'second');
+    if (hc.type === 'faculty_unavailability' && daysOfWeek.includes(hc.day)) {
+      if (hc.timeslot && !timeSlots.some(s => s.startTime === hc.timeslot)) return;
+      blocked[hc.facultyId] = (blocked[hc.facultyId] || 0) + (hc.timeslot ? 1 : timeSlots.length);
+    }
+  });
+
+  const tight = [];
+
+  // Teacher pressure
+  const load = {};
+  assignments.forEach(a => { load[a.facultyId] = (load[a.facultyId] || 0) + parseInt(a.timesPerWeek || 1); });
+  Object.entries(load).forEach(([facId, used]) => {
+    const half    = halfOnly.get(facId);
+    const cap     = (half === 'first'  ? daysOfWeek.length * firstHalfCount
+                  :  half === 'second' ? daysOfWeek.length * (timeSlots.length - firstHalfCount)
+                  :  slotsPerWeek) - (blocked[facId] || 0);
+    const f = faculty.find(x => x.id === facId);
+    if (cap > 0 && used / cap >= 0.8) {
+      tight.push({ kind: 'faculty', name: f ? f.name : facId, used, capacity: cap,
+                   percent: Math.round((used / cap) * 100) });
+    }
+  });
+
+  // Division pressure
+  const divLoad = {};
+  assignments.forEach(a => { if (a.divisionId) divLoad[a.divisionId] = (divLoad[a.divisionId] || 0) + parseInt(a.timesPerWeek || 1); });
+  standards.forEach(std => (std.divisions || []).forEach(d => {
+    const used = divLoad[d.id] || 0;
+    if (used / slotsPerWeek >= 0.8) {
+      tight.push({ kind: 'division', name: `${std.name}-${d.label}`, used, capacity: slotsPerWeek,
+                   percent: Math.round((used / slotsPerWeek) * 100) });
+    }
+  }));
+
+  tight.sort((a, b) => b.percent - a.percent);
+
+  const suggestions = [];
+  const worst = tight[0];
+  if (worst && worst.percent >= 95) {
+    suggestions.push(worst.kind === 'faculty'
+      ? `${worst.name} is booked ${worst.used} of ${worst.capacity} periods (${worst.percent}%) — with almost no free slots there is very little room to resolve clashes. Reduce their load or spread it over more teachers.`
+      : `${worst.name} fills ${worst.used} of ${worst.capacity} periods (${worst.percent}%) — an almost completely full week leaves nowhere to move classes.`);
+  }
+  if (tight.some(t => t.kind === 'faculty' && t.percent >= 90))
+    suggestions.push('Add another time slot to the day, or an extra working day — even one more slot gives the scheduler far more freedom.');
+  if (tight.filter(t => t.kind === 'faculty').length >= 3)
+    suggestions.push('Several teachers are near capacity. Adding one more faculty member and splitting a subject between them usually resolves this quickly.');
+  if (hardConstraints.length >= 3)
+    suggestions.push(`You have ${hardConstraints.length} hard constraints. Temporarily relaxing the least important one is often enough to unlock a solution.`);
+  if (suggestions.length === 0)
+    suggestions.push('Nothing looks obviously over-booked, so the clash is likely a specific combination of constraints. Try relaxing one hard constraint, or add a time slot.');
+
+  return { tight: tight.slice(0, 6), suggestions };
+}
+
+/**
+ * GET /api/demo-data – a ready-made sample school for trying the app out.
+ * Feasible by construction (see demo-data.js), so the demo can't land on an
+ * unsolvable configuration.
+ */
+app.get('/api/demo-data', requireAuth, (req, res) => {
+  try {
+    const school = buildDemoSchool();
+    delete school._layout;          // internal scaffolding, not part of a project
+    res.json({ success: true, data: school });
+  } catch (err) {
+    console.error('Demo data generation failed:', err);
+    res.status(500).json({ success: false, error: 'Could not build the demo data.' });
+  }
+});
+
+/** Spawn a GA worker and register it as a job. Returns the job id. */
+function startWorkerJob({ owner, projectId, gaInput, mode, seedGenes }) {
+  const jobId = uid('job');
+  const job = {
+    id: jobId,
+    owner,
+    mode,
+    projectId: projectId || null,
+    status: 'running',
+    startedAt: Date.now(),
+    finishedAt: null,
+    progress: { attempt: 1, generation: 0, totalGenerations: 0, conflicts: null, fitness: null },
+    diagnostics: buildDiagnostics(gaInput),
+    meta: gaInput,
+    result: null,
+    error: null,
+    worker: null
+  };
+  jobs.set(jobId, job);
+
+  const worker = new Worker(path.join(__dirname, 'ga-worker.js'), {
+    workerData: { ...gaInput, mode, seedGenes: seedGenes || null }
+  });
+  job.worker = worker;
+
+  worker.on('message', async msg => {
+    if (msg.type === 'progress') { job.progress = msg; return; }
+    if (msg.type === 'error') {
+      job.status = 'error'; job.error = msg.message; job.finishedAt = Date.now();
+      return;
+    }
+    if (msg.type === 'done') {
+      try {
+        await finishJob(job, msg.solution);
+      } catch (err) {
+        job.status = 'error'; job.error = err.message; job.finishedAt = Date.now();
+        console.error('Post-processing failed:', err);
+      }
+    }
+  });
+
+  worker.on('error', err => {
+    job.status = 'error'; job.error = err.message; job.finishedAt = Date.now();
+    console.error('GA worker error:', err);
+  });
+
+  worker.on('exit', () => {
+    if (job.status === 'running') {
+      job.status = 'error';
+      job.error  = job.error || 'The scheduler stopped unexpectedly.';
+      job.finishedAt = Date.now();
+    }
+    job.worker = null;
+  });
+
+  return jobId;
+}
+
 /**
  * POST /api/generate-timetable
- * Body should include projectId so output is persisted to disk
+ * Validates, then starts a worker job. Responds immediately with a jobId.
  */
-app.post('/api/generate-timetable', requireAuth, async (req, res) => {
+app.post('/api/generate-timetable', requireAuth, (req, res) => {
   try {
     const {
       projectId, standards, faculty, assignments, classrooms,
       daysOfWeek, timeSlots, hardConstraints, softConstraints, breakTime
     } = req.body;
 
-    console.log(`Timetable request from: ${req.user.email}`);
-    console.log('Assignments:', assignments.length);
+    console.log(`Timetable request from: ${req.user.email} (${(assignments || []).length} assignments)`);
 
     const validation = validateInput({ standards, faculty, assignments, classrooms, daysOfWeek, timeSlots });
     if (!validation.isValid) {
@@ -297,68 +580,167 @@ app.post('/api/generate-timetable', requireAuth, async (req, res) => {
     }
 
     const feasibilityCheck = checkFeasibility({
-      standards, assignments, classrooms, daysOfWeek, timeSlots,
+      standards, faculty, assignments, classrooms, daysOfWeek, timeSlots,
       hardConstraints: hardConstraints || [], breakTime
     });
     if (!feasibilityCheck.isPossible) {
       return res.status(400).json({ success: false, impossible: true, error: feasibilityCheck.reason, reasons: feasibilityCheck.reasons });
     }
 
-    const ga = new GeneticAlgorithm({
+    pruneJobs();
+
+    const gaInput = {
       standards, faculty, assignments, classrooms, daysOfWeek, timeSlots,
       hardConstraints: hardConstraints || [],
       softConstraints: softConstraints || [],
       breakTime: breakTime || null
-    });
-
-    // ga.run() blocks until ALL hard constraints are satisfied (conflicts === 0).
-    // It will restart indefinitely — the feasibilityCheck above ensures a solution exists.
-    const solution = ga.run();
-
-    // Defensive check: should never be non-zero, but guard just in case
-    if (solution.conflicts > 0) {
-      console.error(`FATAL: GA returned with ${solution.conflicts} conflicts — this should not happen.`);
-      return res.status(500).json({
-        success: false,
-        error: `Internal error: GA could not eliminate all hard constraint conflicts (${solution.conflicts} remaining). Please report this.`
-      });
-    }
-
-    console.log(`✓ Valid timetable generated — 0 conflicts, fitness=${solution.fitness.toFixed(2)}`);
-
-    const formattedData = formatSolution(solution, { standards, faculty, assignments, classrooms, daysOfWeek, timeSlots });
-
-    const filename = `timetable_${Date.now()}.xlsx`;
-    const filepath = path.join(outputDir, filename);
-    await createExcelTimetable(formattedData, filepath);
-    cleanupOldOutputFiles();
-
-    const stats = {
-      conflicts:  solution.conflicts,
-      fitness:    solution.fitness.toFixed(2),
-      classCount: solution.genes.length,
-      softReport: solution.softReport || []
     };
 
-    if (projectId) {
-      const projects = loadUserProjects(req.user.email);
-      const idx = projects.findIndex(p => p.id === projectId);
-      if (idx !== -1) {
-        projects[idx].scheduleData      = formattedData;
-        projects[idx].scheduleStats     = stats;
-        projects[idx].generatedFilename = filename;
-        projects[idx].updatedAt         = new Date().toISOString();
-        saveUserProjects(req.user.email, projects);
-        console.log(`✓ Output saved to project "${projects[idx].name}"`);
-      }
-    }
+    const jobId = startWorkerJob({ owner: req.user.email, projectId, gaInput, mode: 'generate' });
 
-    res.json({ success: true, filename, filepath: `/output/${filename}`, stats, data: formattedData });
+    res.status(202).json({ success: true, jobId });
 
   } catch (error) {
-    console.error('Error generating timetable:', error);
+    console.error('Error starting generation:', error);
     res.status(500).json({ success: false, error: error.message });
   }
+});
+
+/** Turn a finished solution into the Excel file + saved project output. */
+async function finishJob(job, solution) {
+  const m = job.meta;
+
+  if (solution.conflicts > 0) {
+    job.status = 'error';
+    job.error  = `Internal error: the scheduler returned ${solution.conflicts} unresolved conflict(s).`;
+    job.finishedAt = Date.now();
+    return;
+  }
+
+  const formattedData = formatSolution(solution, m);
+  const filename = `timetable_${Date.now()}.xlsx`;
+  await createExcelTimetable(formattedData, path.join(outputDir, filename));
+  cleanupOldOutputFiles();
+
+  const softReport = solution.softReport || [];
+  const stats = {
+    conflicts:  solution.conflicts,
+    fitness:    Number(solution.fitness).toFixed(2),
+    classCount: solution.genes.length,
+    softReport,
+    // Headline soft score, used for the before/after comparison after an improve run
+    softMet:     softReport.filter(r => r.satisfied).length,
+    softTotal:   softReport.length,
+    softPenalty: solution.softPenalty
+  };
+
+  if (job.projectId) {
+    const projects = loadUserProjects(job.owner);
+    const idx = projects.findIndex(p => p.id === job.projectId);
+    if (idx !== -1) {
+      projects[idx].scheduleData      = formattedData;
+      projects[idx].scheduleStats     = stats;
+      // Raw genes are kept so "Improve schedule" can reseed from this solution
+      // after a page reload, rather than only within the same session.
+      projects[idx].scheduleGenes     = solution.genes;
+      projects[idx].generatedFilename = filename;
+      projects[idx].updatedAt         = new Date().toISOString();
+      saveUserProjects(job.owner, projects);
+    }
+  }
+
+  job.result = { filename, filepath: `/output/${filename}`, stats, data: formattedData, genes: solution.genes };
+  job.status = 'done';
+  job.finishedAt = Date.now();
+  console.log(`✓ Job ${job.id} finished — 0 conflicts, ${solution.genes.length} classes in ${Date.now() - job.startedAt}ms`);
+}
+
+/**
+ * POST /api/improve-timetable
+ * Spends more time reducing soft-constraint penalties on a schedule that already
+ * satisfies every hard constraint. Never returns something worse than the seed.
+ */
+app.post('/api/improve-timetable', requireAuth, (req, res) => {
+  try {
+    const {
+      projectId, standards, faculty, assignments, classrooms,
+      daysOfWeek, timeSlots, hardConstraints, softConstraints, breakTime
+    } = req.body;
+
+    let seedGenes = req.body.genes;
+
+    // Fall back to the genes stored on the project (survives a page reload)
+    if ((!seedGenes || !seedGenes.length) && projectId) {
+      const project = loadUserProjects(req.user.email).find(p => p.id === projectId);
+      if (project) seedGenes = project.scheduleGenes;
+    }
+
+    if (!seedGenes || !seedGenes.length) {
+      return res.status(400).json({ success: false, error: 'Generate a schedule first — there is nothing to improve yet.' });
+    }
+    if (!(softConstraints || []).length) {
+      return res.status(400).json({ success: false, error: 'Add at least one soft constraint before improving — there are no preferences to optimise.' });
+    }
+
+    const validation = validateInput({ standards, faculty, assignments, classrooms, daysOfWeek, timeSlots });
+    if (!validation.isValid) {
+      return res.status(400).json({ success: false, error: validation.errors.join(' | '), errors: validation.errors });
+    }
+
+    pruneJobs();
+
+    const gaInput = {
+      standards, faculty, assignments, classrooms, daysOfWeek, timeSlots,
+      hardConstraints: hardConstraints || [],
+      softConstraints: softConstraints || [],
+      breakTime: breakTime || null
+    };
+
+    const jobId = startWorkerJob({ owner: req.user.email, projectId, gaInput, mode: 'improve', seedGenes });
+    console.log(`Improve request from ${req.user.email} — seeded with ${seedGenes.length} classes`);
+    res.status(202).json({ success: true, jobId });
+
+  } catch (error) {
+    console.error('Error starting improvement:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/** GET /api/jobs/:id – poll progress / collect the result */
+app.get('/api/jobs/:id', requireAuth, (req, res) => {
+  const job = jobs.get(req.params.id);
+  if (!job || job.owner !== req.user.email) {
+    return res.status(404).json({ success: false, error: 'That generation job no longer exists. Please generate again.' });
+  }
+
+  const body = {
+    success: true,
+    status: job.status,
+    elapsedMs: (job.finishedAt || Date.now()) - job.startedAt,
+    progress: job.progress,
+    diagnostics: job.diagnostics
+  };
+  if (job.status === 'done')  Object.assign(body, job.result);
+  if (job.status === 'error') body.error = job.error;
+
+  res.json(body);
+});
+
+/** DELETE /api/jobs/:id – cancel a running generation */
+app.delete('/api/jobs/:id', requireAuth, async (req, res) => {
+  const job = jobs.get(req.params.id);
+  if (!job || job.owner !== req.user.email) {
+    return res.status(404).json({ success: false, error: 'Job not found.' });
+  }
+  if (job.status === 'running') {
+    job.status = 'cancelled';
+    job.finishedAt = Date.now();
+    // terminate() stops the thread mid-loop; the GA has no cancellation points
+    // of its own, so this is what makes Cancel actually work.
+    if (job.worker) { try { await job.worker.terminate(); } catch {} }
+    console.log(`✗ Job ${job.id} cancelled after ${job.finishedAt - job.startedAt}ms`);
+  }
+  res.json({ success: true, status: job.status });
 });
 
 /**
@@ -484,17 +866,43 @@ function validateInput(data) {
     });
   });
 
+  // ── Division validation ──────────────────────────────────────────────
+  const divisionIds  = [];
+  const usedRoomIds  = new Map(); // roomId -> "1st-A"
+  (data.standards || []).forEach(std => {
+    const divisions = std.divisions || [];
+    if (divisions.length === 0)
+      errors.push(`Standard "${std.name || '?'}": Must have at least one division`);
+
+    divisions.forEach(d => {
+      const label = `${std.name || '?'}-${d.label || '?'}`;
+      if (!d.id) { errors.push(`${label}: Missing division ID`); return; }
+
+      if (divisionIds.includes(d.id)) errors.push(`Duplicate division ID "${d.id}"`);
+      else divisionIds.push(d.id);
+
+      if (!d.roomId) {
+        errors.push(`${label}: No classroom assigned — every division needs its own room`);
+      } else if (usedRoomIds.has(d.roomId)) {
+        errors.push(`${label} and ${usedRoomIds.get(d.roomId)} are both assigned the same classroom — each division needs its own room`);
+      } else {
+        usedRoomIds.set(d.roomId, label);
+      }
+    });
+  });
+
   // ── Classroom validation ─────────────────────────────────────────────
-  const classroomNames = [];
+  const seenRoomNames = [];
   (data.classrooms || []).forEach((room, i) => {
-    if (!room || !room.trim()) {
+    const name = (room && room.name || '').trim();
+    if (!name) {
       errors.push(`Classroom ${i + 1}: Name cannot be empty`);
       return;
     }
-    const name = room.trim().toUpperCase();
-    if (classroomNames.includes(name))
-      errors.push(`Duplicate classroom "${room}" — classroom names must be unique`);
-    else classroomNames.push(name);
+    const key = name.toUpperCase();
+    if (seenRoomNames.includes(key))
+      errors.push(`Duplicate classroom "${name}" — classroom names must be unique`);
+    else seenRoomNames.push(key);
   });
 
   // ── Time slot validation ─────────────────────────────────────────────
@@ -513,25 +921,44 @@ function validateInput(data) {
   });
 
   // ── Assignment validation ────────────────────────────────────────────
-  const assignmentIds  = [];
-  const assignmentPairs = []; // courseId+facultyId combos
+  // Which standard owns each course / division, for cross-checks below
+  const standardOfCourse   = {};
+  const standardOfDivision = {};
+  (data.standards || []).forEach(std => {
+    (std.courses   || []).forEach(c => { standardOfCourse[c.id]   = std; });
+    (std.divisions || []).forEach(d => { standardOfDivision[d.id] = std; });
+  });
+
+  const assignmentIds   = [];
+  const divisionCourses = []; // divisionId+courseId — one teacher per course per division
   (data.assignments || []).forEach((a, i) => {
     const label = `Assignment ${i + 1}`;
-    if (!a.courseId)  errors.push(`${label}: No course selected`);
-    if (!a.facultyId) errors.push(`${label}: No faculty selected`);
+    if (!a.courseId)   errors.push(`${label}: No course selected`);
+    if (!a.facultyId)  errors.push(`${label}: No faculty selected`);
+    if (!a.divisionId) errors.push(`${label}: No division selected`);
 
     // Check referenced IDs actually exist
     if (a.courseId && !courseIds.includes(a.courseId))
       errors.push(`${label}: References a course that does not exist`);
     if (a.facultyId && !facultyIds.includes(a.facultyId))
       errors.push(`${label}: References a faculty member that does not exist`);
+    if (a.divisionId && !divisionIds.includes(a.divisionId))
+      errors.push(`${label}: References a division that does not exist`);
 
-    // No two assignments can assign the same course to the same teacher twice
-    if (a.courseId && a.facultyId) {
-      const pair = `${a.courseId}::${a.facultyId}`;
-      if (assignmentPairs.includes(pair))
-        errors.push(`${label}: This course is already assigned to this faculty member`);
-      else assignmentPairs.push(pair);
+    // The course must belong to the division's own standard
+    if (a.divisionId && a.courseId && standardOfDivision[a.divisionId] && standardOfCourse[a.courseId]
+        && standardOfDivision[a.divisionId].id !== standardOfCourse[a.courseId].id) {
+      errors.push(`${label}: That course does not belong to this division's standard`);
+    }
+
+    // A division can't be given the same course twice. Note the same
+    // course+teacher pair across *different* divisions is perfectly normal —
+    // one teacher commonly takes the same subject for several divisions.
+    if (a.divisionId && a.courseId) {
+      const pair = `${a.divisionId}::${a.courseId}`;
+      if (divisionCourses.includes(pair))
+        errors.push(`${label}: This division already has this course assigned`);
+      else divisionCourses.push(pair);
     }
 
     if (a.id) {
@@ -553,90 +980,110 @@ function validateInput(data) {
 
 function checkFeasibility(data) {
   const reasons = [];
-  const { assignments, classrooms, daysOfWeek, timeSlots, hardConstraints = [], breakTime } = data;
+  const { assignments, classrooms, daysOfWeek, timeSlots, standards = [], hardConstraints = [], breakTime } = data;
+
+  const slotsPerWeek = daysOfWeek.length * timeSlots.length;
 
   // Work out how many first-half slots exist (for faculty_first_half_only constraint)
   const firstHalfCount = breakTime && breakTime.start
     ? timeSlots.filter(s => s.startTime < breakTime.start).length
     : timeSlots.length;
 
-  const totalSlots  = classrooms.length * daysOfWeek.length * timeSlots.length;
-  let totalNeeded   = 0;
+  // ── Readable labels ───────────────────────────────────────────────────
+  const facultyName = id => {
+    const f = (data.faculty || []).find(x => x.id === id);
+    return f && f.name ? f.name : id;
+  };
+  const divisionLabel = {};   // divisionId -> "1st-A"
+  standards.forEach(std => {
+    (std.divisions || []).forEach(d => { divisionLabel[d.id] = `${std.name}-${d.label}`; });
+  });
+  const divName = id => divisionLabel[id] || id;
+
+  // ── Global capacity: every division has its own room, so the ceiling is
+  //    divisions × days × slots (rooms no longer multiply capacity) ──
+  const allDivisions = standards.flatMap(s => (s.divisions || []));
+  const totalSlots   = allDivisions.length * slotsPerWeek;
+  let totalNeeded    = 0;
   assignments.forEach(a => { totalNeeded += parseInt(a.timesPerWeek || 1); });
 
-  if (totalNeeded > totalSlots) {
+  if (allDivisions.length > 0 && totalNeeded > totalSlots) {
     reasons.push(
-      `Need ${totalNeeded} class slots but only ${totalSlots} available ` +
-      `(${classrooms.length} classrooms × ${daysOfWeek.length} days × ${timeSlots.length} slots). ` +
-      `Add more classrooms, days, or time slots.`
+      `Need ${totalNeeded} class slots but only ${totalSlots} exist ` +
+      `(${allDivisions.length} divisions × ${daysOfWeek.length} days × ${timeSlots.length} slots). ` +
+      `Add more days or time slots, or reduce how often courses meet.`
     );
   }
 
-  // Per-faculty feasibility — check if first-half-only faculty have enough slots
+  // ── One room per division ──
+  if (classrooms.length < allDivisions.length) {
+    reasons.push(
+      `There are ${allDivisions.length} divisions but only ${classrooms.length} classroom(s). ` +
+      `Each division needs its own room — add ${allDivisions.length - classrooms.length} more.`
+    );
+  }
+
+  // ── Per-faculty capacity ──
+  // A teacher can only be in one room at a time, so their ceiling is
+  // days × slots. (This used to be multiplied by the classroom count, which
+  // overstated every teacher's availability and let impossible inputs through.)
   const facultyLoad = {};
   assignments.forEach(a => {
     facultyLoad[a.facultyId] = (facultyLoad[a.facultyId] || 0) + parseInt(a.timesPerWeek || 1);
   });
 
-  const firstHalfOnlyFaculty = new Set(
-    (hardConstraints || [])
-      .filter(hc => hc.type === 'faculty_first_half_only')
-      .map(hc => hc.facultyId)
-  );
+  const halfOnly = new Map(); // facultyId -> 'first' | 'second'
+  (hardConstraints || []).forEach(hc => {
+    if (hc.type === 'faculty_first_half_only')  halfOnly.set(hc.facultyId, 'first');
+    if (hc.type === 'faculty_second_half_only') halfOnly.set(hc.facultyId, 'second');
+  });
+
+  // Blocked (day, slot) pairs per faculty — again not multiplied by rooms
+  const blockedSlots = {};
+  (hardConstraints || []).forEach(hc => {
+    if (hc.type !== 'faculty_unavailability') return;
+    if (daysOfWeek.indexOf(hc.day) === -1) return;
+    // A timeslot that no longer matches any current slot is ignored, matching ga.js
+    if (hc.timeslot && !timeSlots.some(s => s.startTime === hc.timeslot)) return;
+    const slotCount = hc.timeslot ? 1 : timeSlots.length;
+    blockedSlots[hc.facultyId] = (blockedSlots[hc.facultyId] || 0) + slotCount;
+  });
 
   Object.entries(facultyLoad).forEach(([facId, load]) => {
-    const maxSlots = firstHalfOnlyFaculty.has(facId)
-      ? classrooms.length * daysOfWeek.length * firstHalfCount
-      : classrooms.length * daysOfWeek.length * timeSlots.length;
+    const half     = halfOnly.get(facId);
+    const halfCap  = half === 'first'  ? daysOfWeek.length * firstHalfCount
+                   : half === 'second' ? daysOfWeek.length * (timeSlots.length - firstHalfCount)
+                   : slotsPerWeek;
+    const maxSlots = Math.max(0, halfCap - (blockedSlots[facId] || 0));
+
     if (load > maxSlots) {
+      const limits = [];
+      if (half) limits.push(`${half}-half-only`);
+      if (blockedSlots[facId]) limits.push(`${blockedSlots[facId]} blocked slot(s)`);
       reasons.push(
-        `Faculty "${facId}" needs to teach ${load} classes but only has ${maxSlots} available slots` +
-        (firstHalfOnlyFaculty.has(facId) ? ` (first-half-only constraint active)` : ``)
+        `${facultyName(facId)} is assigned ${load} classes but only has ${maxSlots} available period(s)` +
+        (limits.length ? ` (${limits.join(', ')})` : '') +
+        `. Reduce their load, or add more days or time slots.`
       );
     }
   });
 
-  // Faculty unavailability — subtract blocked slots per faculty
-  const blockedSlots = {}; // facultyId → count of blocked (day,slot) pairs
-  (hardConstraints || []).forEach(hc => {
-    if (hc.type !== 'faculty_unavailability') return;
-    const dayIdx  = daysOfWeek.indexOf(hc.day);
-    if (dayIdx === -1) return;
-    const slotCount = hc.timeslot
-      ? 1
-      : timeSlots.length;
-    blockedSlots[hc.facultyId] = (blockedSlots[hc.facultyId] || 0) + (classrooms.length * slotCount);
+  // ── Per-division capacity — a division attends one class at a time ──
+  const divisionLoad = {};
+  assignments.forEach(a => {
+    if (!a.divisionId) return;
+    divisionLoad[a.divisionId] = (divisionLoad[a.divisionId] || 0) + parseInt(a.timesPerWeek || 1);
   });
 
-  Object.entries(facultyLoad).forEach(([facId, load]) => {
-    const blocked  = blockedSlots[facId] || 0;
-    const maxSlots = classrooms.length * daysOfWeek.length * timeSlots.length - blocked;
-    if (load > maxSlots) {
-      reasons.push(`Faculty "${facId}" needs ${load} classes but unavailability constraints leave only ${maxSlots} valid slots.`);
+  Object.entries(divisionLoad).forEach(([divId, needed]) => {
+    if (needed > slotsPerWeek) {
+      reasons.push(
+        `${divName(divId)} needs ${needed} class slots but only ${slotsPerWeek} exist ` +
+        `(${daysOfWeek.length} days × ${timeSlots.length} slots). ` +
+        `A division can only attend one class per time slot. Add more days or time slots.`
+      );
     }
   });
-
-  // Per-standard feasibility — a standard can only have ONE class per timeslot
-  // (regardless of how many classrooms exist), so maxSlots = days × timeslots.
-  if (data.standards && Array.isArray(data.standards)) {
-    const maxSlotsPerStandard = daysOfWeek.length * timeSlots.length;
-    data.standards.forEach(std => {
-      const courseIds = (std.courses || []).map(c => c.id);
-      let needed = 0;
-      assignments.forEach(a => {
-        if (courseIds.includes(a.courseId)) {
-          needed += parseInt(a.timesPerWeek || 1);
-        }
-      });
-      if (needed > maxSlotsPerStandard) {
-        reasons.push(
-          `Standard "${std.name}" needs ${needed} class slots but only ${maxSlotsPerStandard} exist ` +
-          `(${daysOfWeek.length} days × ${timeSlots.length} slots). ` +
-          `A standard can only attend one class per time slot. Add more days or time slots.`
-        );
-      }
-    });
-  }
 
   if (reasons.length > 0) {
     return {
@@ -653,15 +1100,27 @@ function formatSolution(solution, metadata) {
   const schedule = {};
   metadata.daysOfWeek.forEach(day => { schedule[day] = []; });
 
-  solution.genes.forEach(gene => {
-    const day       = metadata.daysOfWeek[gene.dayIdx];
-    const timeSlot  = metadata.timeSlots[gene.timeSlotIdx];
-    const classroom = metadata.classrooms[gene.classroomIdx];
+  // divisionId -> { label: "1st-A", standardName, roomName }
+  const divisionInfo = {};
+  (metadata.standards || []).forEach(std => {
+    (std.divisions || []).forEach(d => {
+      const room = (metadata.classrooms || []).find(r => r.id === d.roomId);
+      divisionInfo[d.id] = {
+        label:        `${std.name}-${d.label}`,
+        standardName: std.name,
+        roomName:     room ? room.name : ''
+      };
+    });
+  });
 
-    let courseName = '', courseCode = '', standardName = '';
+  solution.genes.forEach(gene => {
+    const day      = metadata.daysOfWeek[gene.dayIdx];
+    const timeSlot = metadata.timeSlots[gene.timeSlotIdx];
+    const info     = divisionInfo[gene.divisionId] || { label: '', standardName: '', roomName: '' };
+
+    let courseName = '', courseCode = '';
     const standard = metadata.standards.find(s => s.courses && s.courses.some(c => c.id === gene.courseId));
     if (standard) {
-      standardName = standard.name;
       const course = standard.courses.find(c => c.id === gene.courseId);
       if (course) { courseName = course.name; courseCode = course.courseCode; }
     }
@@ -672,12 +1131,17 @@ function formatSolution(solution, metadata) {
       timeSlot,
       startTime:   timeSlot.startTime,
       endTime:     timeSlot.endTime,
-      standard:    standardName,
-      course:      courseName,
+      // `standard` carries the division label ("1st-A") because the timetable
+      // views group by it, and a division is what actually sits in a room.
+      standard:     info.label,
+      divisionId:   gene.divisionId,
+      divisionLabel: info.label,
+      standardName: info.standardName,
+      course:       courseName,
       courseCode,
-      faculty:     faculty ? faculty.name : '',
-      facultyCode: faculty ? faculty.facultyCode : '',
-      classroom
+      faculty:      faculty ? faculty.name : '',
+      facultyCode:  faculty ? faculty.facultyCode : '',
+      classroom:    info.roomName
     });
   });
 
@@ -744,7 +1208,7 @@ async function createExcelTimetable(schedule, filepath) {
   worksheet.getRow(1).height = 24;
 
   worksheet.getCell('A2').value = 'Day';
-  worksheet.getCell('B2').value = 'Standard';
+  worksheet.getCell('B2').value = 'Division';
   worksheet.getCell('C2').value = 'Classes';
   timeSlots.forEach((time, idx) => {
     const col = excelColName(3 + idx); // D, E, F, ...
