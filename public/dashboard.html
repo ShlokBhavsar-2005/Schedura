@@ -1,184 +1,83 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Projects · Schedura</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="description" content="Your Schedura timetable projects." />
+  <meta name="robots" content="noindex" />
+  <meta name="theme-color" content="#FFFFFF" />
+
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/app.css" />
+
   <style>
-    :root {
-      --bg:             #F5F2EB;
-      --surface:        #FFFFFF;
-      --surface-alt:    #FBF9F4;
-      --surface-sunken: #F0ECE2;
-      --border:         #E0DACE;
-      --border-strong:  #C8C0AF;
-      --text:           #1F232B;
-      --text-secondary: #4A4F59;
-      --muted:          #7C776E;
-      --accent:         #2C4A70;
-      --accent-hover:   #1E3553;
-      --accent-soft:    #ECF1F7;
-      --accent-border:  #C3D2E4;
-      --success:        #2A6B47;
-      --success-soft:   #EBF3EE;
-      --success-border: #BFD9CB;
-      --danger:         #A32B22;
-      --danger-soft:    #FAEDEC;
-      --danger-border:  #E6C5C2;
-      --radius:         6px;
-      --shadow-sm:      0 1px 2px rgba(31,35,43,0.05);
-      --shadow-md:      0 4px 14px rgba(31,35,43,0.10);
+    .main {
+      max-width: 1060px;
+      margin: 0 auto;
+      padding: 30px 24px 64px;
     }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    body {
-      font-family: 'IBM Plex Sans', system-ui, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    /* ── TOP BAR ── */
-    .nav {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 28px;
-      height: 58px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      position: sticky; top: 0; z-index: 100;
-    }
-
-    .nav-brand {
-      font-family: 'IBM Plex Serif', Georgia, serif;
-      font-size: 19px;
-      font-weight: 600;
-      color: var(--text);
-      text-decoration: none;
-      letter-spacing: -0.01em;
-    }
-
-    .nav-right { display: flex; align-items: center; gap: 14px; }
-
-    .user-email {
-      font-size: 13px;
-      color: var(--muted);
-      max-width: 220px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .btn-signout {
-      background: transparent;
-      border: 1px solid var(--border-strong);
-      color: var(--text-secondary);
-      border-radius: var(--radius);
-      padding: 6px 13px;
-      font-size: 13px;
-      font-family: inherit;
-      cursor: pointer;
-      transition: background .15s, border-color .15s;
-    }
-
-    .btn-signout:hover { background: var(--surface-sunken); border-color: var(--muted); }
-
-    /* ── LAYOUT ── */
-    .main { max-width: 1060px; margin: 0 auto; padding: 40px 28px 64px; }
 
     .page-header {
       display: flex;
-      align-items: flex-end;
       justify-content: space-between;
-      gap: 20px;
-      margin-bottom: 28px;
+      align-items: flex-end;
+      gap: 16px;
+      margin-bottom: 22px;
       flex-wrap: wrap;
     }
 
     .page-header h1 {
-      font-family: 'IBM Plex Serif', Georgia, serif;
-      font-size: 26px;
+      font-size: 23px;
       font-weight: 600;
-      letter-spacing: -0.01em;
+      margin: 0 0 5px;
     }
 
-    .page-header p { color: var(--muted); font-size: 14px; margin-top: 5px; }
-
-    .btn-primary {
-      display: inline-flex; align-items: center; gap: 7px;
-      background: var(--accent);
-      color: #fff;
-      border: 1px solid var(--accent);
-      border-radius: var(--radius);
-      padding: 9px 16px;
-      font-size: 14px;
-      font-weight: 500;
-      font-family: inherit;
-      cursor: pointer;
-      transition: background .15s;
+    .page-header p {
+      font-size: 13.5px;
+      color: var(--muted);
+      margin: 0;
     }
 
-    .btn-primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
-
-    /* ── SEARCH ── */
     .search-bar {
-      display: flex;
-      align-items: center;
-      gap: 9px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 0 13px;
-      margin-bottom: 22px;
-      transition: border-color .15s, box-shadow .15s;
+      position: relative;
+      margin-bottom: 20px;
+      max-width: 340px;
     }
 
-    .search-bar:focus-within {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--accent-soft);
+    .search-bar svg {
+      position: absolute;
+      left: 11px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      pointer-events: none;
     }
 
-    .search-bar svg { color: var(--muted); flex-shrink: 0; }
+    .search-bar input { padding-left: 33px; }
 
-    .search-bar input {
-      flex: 1;
-      background: transparent;
-      border: none;
-      outline: none;
-      color: var(--text);
-      font-size: 14px;
-      font-family: inherit;
-      padding: 10px 0;
-    }
-
-    .search-bar input::placeholder { color: var(--muted); }
-
-    /* ── PROJECT GRID ── */
     .projects-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
-      gap: 16px;
+      grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+      gap: 14px;
     }
 
     .project-card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 18px;
+      border-radius: var(--radius-lg);
+      padding: 17px;
       cursor: pointer;
-      transition: border-color .15s, box-shadow .15s;
-      position: relative;
+      transition: border-color .15s, box-shadow .15s, transform .15s;
       display: flex;
       flex-direction: column;
+      position: relative;
     }
 
     .project-card:hover {
       border-color: var(--border-strong);
       box-shadow: var(--shadow-md);
+      transform: translateY(-1px);
     }
 
     .project-card-top {
@@ -190,241 +89,126 @@
 
     .project-icon {
       width: 34px; height: 34px;
+      border-radius: 8px;
       background: var(--accent-soft);
       border: 1px solid var(--accent-border);
-      border-radius: var(--radius);
-      display: flex; align-items: center; justify-content: center;
       color: var(--accent);
-      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .project-name {
       font-size: 15px;
       font-weight: 600;
       margin-bottom: 4px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      word-break: break-word;
+      line-height: 1.35;
+    }
+
+    .project-sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 13px;
+      line-height: 1.5;
     }
 
     .project-meta {
-      font-size: 12.5px;
-      color: var(--muted);
       display: flex;
       align-items: center;
-      gap: 10px;
-      margin-top: 8px;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: auto;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      font-size: 11.5px;
+      color: var(--muted);
     }
 
-    .badge {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 3px;
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: .02em;
-      text-transform: uppercase;
-    }
-
-    .badge-done  { background: var(--success-soft); color: var(--success); border: 1px solid var(--success-border); }
-    .badge-draft { background: var(--surface-sunken); color: var(--muted); border: 1px solid var(--border); }
-
+    /* Row actions stay out of the way until the card is hovered or focused —
+       three buttons shouting on every card is what makes a grid feel like a
+       control panel instead of a list of your work. */
     .card-actions {
       display: flex;
       gap: 6px;
-      margin-top: 16px;
-      padding-top: 13px;
-      border-top: 1px solid var(--border);
+      margin-top: 12px;
+      opacity: 0;
+      transition: opacity .15s;
     }
 
-    .card-action-btn {
-      flex: 1;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      color: var(--text-secondary);
-      border-radius: var(--radius);
-      padding: 6px 4px;
-      font-size: 12px;
-      font-family: inherit;
-      font-weight: 500;
-      cursor: pointer;
-      transition: background .15s, border-color .15s, color .15s;
-      white-space: nowrap;
-    }
+    .project-card:hover .card-actions,
+    .project-card:focus-within .card-actions { opacity: 1; }
 
-    .card-action-btn:hover { background: var(--surface-sunken); border-color: var(--border-strong); color: var(--text); }
-    .card-action-btn.danger:hover { background: var(--danger-soft); border-color: var(--danger-border); color: var(--danger); }
+    @media (hover: none) { .card-actions { opacity: 1; } }
 
-    /* ── DROPDOWN ── */
-    .project-menu-btn {
-      background: transparent;
-      border: 1px solid transparent;
-      color: var(--muted);
-      cursor: pointer;
-      padding: 3px 6px;
-      border-radius: 4px;
-      font-size: 16px;
-      line-height: 1;
-      transition: background .15s, color .15s;
-    }
-
-    .project-menu-btn:hover { background: var(--surface-sunken); color: var(--text); }
+    .menu-wrap { position: relative; }
 
     .dropdown {
       position: absolute;
-      top: 46px; right: 16px;
+      right: 0;
+      top: calc(100% + 5px);
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      overflow: hidden;
-      z-index: 50;
-      min-width: 150px;
       box-shadow: var(--shadow-md);
+      min-width: 168px;
+      padding: 5px;
       display: none;
+      z-index: 20;
     }
 
     .dropdown.open { display: block; }
 
     .dropdown button {
-      display: block;
-      width: 100%; padding: 9px 13px;
-      background: transparent;
-      border: none;
-      color: var(--text);
-      font-size: 13px;
-      font-family: inherit;
-      cursor: pointer;
-      text-align: left;
-    }
-
-    .dropdown button:hover { background: var(--surface-sunken); }
-
-    /* ── EMPTY STATE ── */
-    .empty-state {
-      text-align: center;
-      padding: 72px 20px;
-      color: var(--muted);
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-    }
-
-    .empty-state svg { color: var(--border-strong); margin-bottom: 16px; }
-    .empty-state h3 { font-size: 16px; color: var(--text); margin-bottom: 7px; font-weight: 600; }
-    .empty-state p { font-size: 14px; margin: 0; }
-
-    /* ── MODAL ── */
-    .modal-backdrop {
-      position: fixed; inset: 0;
-      background: rgba(31,35,43,0.34);
-      z-index: 200;
-      display: none;
+      display: flex;
       align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-
-    .modal-backdrop.open { display: flex; }
-
-    .modal {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 26px;
+      gap: 9px;
       width: 100%;
-      max-width: 410px;
-      box-shadow: 0 16px 48px rgba(31,35,43,0.18);
-    }
-
-    .modal h2 { font-size: 17px; margin-bottom: 6px; font-weight: 600; }
-    .modal p  { font-size: 13px; color: var(--muted); margin-bottom: 20px; line-height: 1.5; }
-
-    .modal label {
-      display: block;
-      font-size: 11.5px;
-      font-weight: 600;
-      color: var(--text-secondary);
-      text-transform: uppercase;
-      letter-spacing: .05em;
-      margin-bottom: 7px;
-    }
-
-    .modal input {
-      width: 100%;
-      background: var(--surface);
-      border: 1px solid var(--border-strong);
-      border-radius: var(--radius);
-      color: var(--text);
-      font-size: 14px;
-      font-family: inherit;
-      padding: 9px 12px;
-      outline: none;
-      transition: border-color .15s, box-shadow .15s;
-      margin-bottom: 20px;
-    }
-
-    .modal input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-
-    .modal-actions { display: flex; gap: 9px; justify-content: flex-end; }
-
-    .btn-cancel {
-      background: var(--surface);
-      border: 1px solid var(--border-strong);
-      color: var(--text-secondary);
-      border-radius: var(--radius);
-      padding: 8px 16px;
-      font-size: 14px;
-      font-family: inherit;
-      cursor: pointer;
-      transition: background .15s;
-    }
-
-    .btn-cancel:hover { background: var(--surface-sunken); }
-
-    /* ── TOAST ── */
-    .toast {
-      position: fixed;
-      bottom: 24px; right: 24px;
-      background: var(--text);
-      border-radius: var(--radius);
-      padding: 11px 17px;
+      text-align: left;
+      background: none;
+      border: none;
+      padding: 8px 10px;
       font-size: 13px;
-      color: #fff;
-      box-shadow: var(--shadow-md);
-      z-index: 999;
-      transform: translateY(70px);
-      opacity: 0;
-      transition: all .25s;
-      pointer-events: none;
+      color: var(--text-secondary);
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: inherit;
     }
 
-    .toast.show { transform: translateY(0); opacity: 1; }
+    .dropdown button:hover { background: var(--surface-sunken); color: var(--text); }
+    .dropdown button.danger { color: var(--danger); }
+    .dropdown button.danger:hover { background: var(--danger-soft); }
 
-    @media (max-width: 640px) {
-      .nav { padding: 0 16px; }
-      .user-email { display: none; }
-      .main { padding: 28px 16px 48px; }
-      .page-header { align-items: flex-start; flex-direction: column; }
+    .share-link-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-top: 6px;
+    }
+
+    .share-link-row input {
+      font-family: 'IBM Plex Mono', ui-monospace, monospace;
+      font-size: 12px;
     }
   </style>
 </head>
 <body>
 
-<nav class="nav">
-  <a class="nav-brand" href="dashboard.html">Schedura</a>
-  <div class="nav-right">
-    <span class="user-email" id="navEmail"></span>
-    <button class="btn-signout" onclick="doLogout()">Sign out</button>
+<header class="topbar">
+  <a class="topbar-brand" href="/projects">Schedura</a>
+  <div class="topbar-right">
+    <span class="topbar-user" id="topbarUser"></span>
+    <button class="btn btn-quiet btn-sm" id="signOutBtn">Sign out</button>
   </div>
-</nav>
+</header>
 
 <main class="main">
   <div class="page-header">
     <div>
       <h1>Projects</h1>
-      <p>Open a project to edit its inputs and view the generated schedule.</p>
+      <p>Open a project to edit its inputs or view the generated schedule.</p>
     </div>
-    <button class="btn-primary" onclick="openNewModal()">
+    <button class="btn btn-primary" id="newProjectBtn">
       <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
       New project
     </button>
@@ -432,127 +216,129 @@
 
   <div class="search-bar">
     <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-    <input type="text" id="searchInput" placeholder="Search projects" oninput="renderProjects()"/>
+    <label class="sr-only" for="searchInput">Search projects</label>
+    <input type="text" id="searchInput" placeholder="Search projects" autocomplete="off"/>
   </div>
 
   <div class="projects-grid" id="projectsGrid"></div>
 </main>
 
-<!-- NEW PROJECT MODAL -->
-<div class="modal-backdrop" id="newModal">
-  <div class="modal">
-    <h2>New project</h2>
-    <p>Give your project a name. You can rename it later.</p>
-    <label for="newProjectName">Project name</label>
-    <input type="text" id="newProjectName" placeholder="Your project" maxlength="60"
-      onkeydown="if(event.key==='Enter') createProject()"/>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeNewModal()">Cancel</button>
-      <button class="btn-primary" onclick="createProject()">Create project</button>
-    </div>
-  </div>
-</div>
-
-<!-- RENAME MODAL -->
-<div class="modal-backdrop" id="renameModal">
-  <div class="modal">
-    <h2>Rename project</h2>
-    <p>Enter a new name for this project.</p>
-    <label for="renameInput">Project name</label>
-    <input type="text" id="renameInput" maxlength="60"
-      onkeydown="if(event.key==='Enter') confirmRename()"/>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeRenameModal()">Cancel</button>
-      <button class="btn-primary" onclick="confirmRename()">Rename</button>
-    </div>
-  </div>
-</div>
-
-<div class="toast" id="toast"></div>
-
+<script src="/ui.js"></script>
 <script>
-const API   = '';  // relative — works on any host
-const TOKEN = sessionStorage.getItem('auth_token');
-const EMAIL = sessionStorage.getItem('auth_email');
-
-if (!TOKEN) location.href = 'login.html';
-document.getElementById('navEmail').textContent = EMAIL || '';
-
-// ── API helper ──
-async function apiFetch(path, options = {}) {
-  const res = await fetch(API + path, {
-    ...options,
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${TOKEN}`, ...(options.headers||{}) }
-  });
-  if (res.status === 401) { doLogout(); return null; }
-  return res.json();
-}
+const { escHtml, escAttr, toast, relTime } = Schedura;
 
 let allProjects = [];
 
-// ── Load from server ──
+/* ── Loading ─────────────────────────────────────────────────────────────── */
+
+function renderSkeletons() {
+  document.getElementById('projectsGrid').innerHTML = Array.from({ length: 3 }, () => `
+    <div class="project-card" style="cursor:default" aria-hidden="true">
+      <div class="project-card-top"><div class="skeleton" style="width:34px;height:34px;border-radius:8px"></div></div>
+      <div class="skeleton skeleton-line" style="width:65%;height:15px"></div>
+      <div class="skeleton skeleton-line" style="width:88%"></div>
+      <div class="skeleton skeleton-line" style="width:42%;margin-top:14px"></div>
+    </div>`).join('');
+}
+
 async function loadAndRender() {
-  const grid = document.getElementById('projectsGrid');
-  grid.innerHTML = `<div style="grid-column:1/-1;padding:56px;text-align:center;color:var(--muted);font-size:14px">Loading projects…</div>`;
-  const data = await apiFetch('/api/projects');
-  if (!data) return;
+  renderSkeletons();
+  const data = await Schedura.api('/api/projects');
+  if (!data.ok) {
+    document.getElementById('projectsGrid').innerHTML = `
+      <div class="empty" style="grid-column:1/-1">
+        <h3>Could not load your projects</h3>
+        <p>${escHtml(data.error || 'Something went wrong reaching the server.')}</p>
+        <div class="empty-actions"><button class="btn btn-primary" onclick="loadAndRender()">Try again</button></div>
+      </div>`;
+    return;
+  }
   allProjects = data.projects || [];
   renderProjects();
 }
 
-// ── Render list ──
+/* ── Rendering ───────────────────────────────────────────────────────────── */
+
 function renderProjects() {
   const query = document.getElementById('searchInput').value.toLowerCase().trim().replace(/\s+/g, ' ');
   const projects = allProjects.filter(p => p.name.toLowerCase().trim().replace(/\s+/g, ' ').includes(query));
   const grid = document.getElementById('projectsGrid');
 
-  if (projects.length === 0) {
+  if (!projects.length) {
     grid.innerHTML = `
-      <div class="empty-state" style="grid-column:1/-1">
+      <div class="empty" style="grid-column:1/-1">
         <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
         <h3>${query ? 'No matching projects' : 'No projects yet'}</h3>
-        <p>${query ? 'Try a different search term.' : 'Use “New project” above to get started.'}</p>
+        <p>${query
+          ? 'Nothing matches that search. Try a shorter term.'
+          : 'A project holds one school’s standards, teachers, rooms and rules — and the timetable built from them.'}</p>
+        <div class="empty-actions">
+          ${query
+            ? `<button class="btn" onclick="clearSearch()">Clear search</button>`
+            : `<button class="btn btn-primary" id="emptyNewBtn">Create your first project</button>`}
+        </div>
       </div>`;
+    const b = document.getElementById('emptyNewBtn');
+    if (b) b.onclick = createProject;
     return;
   }
 
   grid.innerHTML = projects.map(p => {
-    const date = new Date(p.updatedAt).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
+    const c = p.counts || {};
+    const parts = [];
+    if (c.standards) parts.push(`${c.standards} standard${c.standards === 1 ? '' : 's'}`);
+    if (c.divisions) parts.push(`${c.divisions} division${c.divisions === 1 ? '' : 's'}`);
+    if (c.faculty)   parts.push(`${c.faculty} teacher${c.faculty === 1 ? '' : 's'}`);
+    const summary = parts.length ? parts.join(' · ') : 'Empty — nothing added yet';
+
+    const when = p.lastGeneratedAt
+      ? `Generated ${relTime(p.lastGeneratedAt)}`
+      : `Edited ${relTime(p.updatedAt)}`;
+
     return `
-    <div class="project-card" onclick="openProject(${escAttr(p.id)})">
+    <div class="project-card" tabindex="0" role="link"
+         onclick="openProject(${escAttr(p.id)})"
+         onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openProject(${escAttr(p.id)})}">
       <div class="project-card-top">
         <div class="project-icon">
           <svg width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/></svg>
         </div>
-        <button class="project-menu-btn" onclick="event.stopPropagation(); toggleMenu('menu-${p.id}')" title="More actions">&#8943;</button>
-        <div class="dropdown" id="menu-${p.id}">
-          <button onclick="event.stopPropagation(); duplicateProject(${escAttr(p.id)})">Duplicate</button>
+        <div class="menu-wrap" onclick="event.stopPropagation()">
+          <button class="btn-icon" aria-label="More actions for ${escHtml(p.name)}"
+                  onclick="toggleMenu('menu-${escHtml(p.id)}')">&#8943;</button>
+          <div class="dropdown" id="menu-${escHtml(p.id)}">
+            <button onclick="startRename(${escAttr(p.id)}, ${escAttr(p.name)})">Rename</button>
+            <button onclick="duplicateProject(${escAttr(p.id)})">Duplicate</button>
+            <button onclick="openShare(${escAttr(p.id)}, ${escAttr(p.name)})">Share link…</button>
+            <button class="danger" onclick="deleteProject(${escAttr(p.id)})">Delete</button>
+          </div>
         </div>
       </div>
+
       <div class="project-name">${escHtml(p.name)}</div>
+      <div class="project-sub">${escHtml(summary)}</div>
+
       <div class="project-meta">
-        <span>Updated ${date}</span>
-        <span class="badge ${p.hasOutput ? 'badge-done' : 'badge-draft'}">${p.hasOutput ? 'Generated' : 'Draft'}</span>
+        <span class="badge ${p.hasOutput ? 'badge-done' : 'badge-draft'}">${p.hasOutput ? `${c.classes || 0} classes` : 'Draft'}</span>
+        ${p.shared ? `<span class="badge badge-info">Shared</span>` : ''}
+        <span style="margin-left:auto">${escHtml(when)}</span>
       </div>
+
       <div class="card-actions" onclick="event.stopPropagation()">
-        <button class="card-action-btn" onclick="openProject(${escAttr(p.id)})">Open</button>
-        <button class="card-action-btn" onclick="startRename(${escAttr(p.id)}, ${escAttr(p.name)})">Rename</button>
-        <button class="card-action-btn danger" onclick="deleteProject(${escAttr(p.id)})">Delete</button>
+        <button class="btn btn-sm" onclick="openProject(${escAttr(p.id)})">Open</button>
+        ${p.hasOutput ? `<button class="btn btn-sm" onclick="openProject(${escAttr(p.id)}, 'schedule')">Schedule</button>` : ''}
       </div>
     </div>`;
   }).join('');
 }
 
-function escHtml(s) {
-  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function clearSearch() {
+  document.getElementById('searchInput').value = '';
+  renderProjects();
 }
 
-// Safely embed a value as a JS string literal inside an inline handler attribute.
-function escAttr(value) {
-  return escHtml(JSON.stringify(String(value)));
-}
+/* ── Menus ───────────────────────────────────────────────────────────────── */
 
-// ── Menu toggle ──
 let openMenu = null;
 function toggleMenu(id) {
   const el = document.getElementById(id);
@@ -562,57 +348,58 @@ function toggleMenu(id) {
 }
 document.addEventListener('click', () => { if (openMenu) { openMenu.classList.remove('open'); openMenu = null; } });
 
-// ── Open ──
-function openProject(id) {
-  sessionStorage.setItem('active_project_id', id);
-  location.href = 'index.html';
-}
+/* ── Actions ─────────────────────────────────────────────────────────────── */
 
-// ── Create ──
-function openNewModal() {
-  document.getElementById('newProjectName').value = '';
-  document.getElementById('newModal').classList.add('open');
-  setTimeout(() => document.getElementById('newProjectName').focus(), 80);
+function openProject(id, step = 'standards') {
+  location.href = `/projects/${encodeURIComponent(id)}/${step}`;
 }
-function closeNewModal() { document.getElementById('newModal').classList.remove('open'); }
 
 async function createProject() {
-  const name = document.getElementById('newProjectName').value.trim();
+  const name = await Schedura.promptText({
+    title: 'New project',
+    body: 'A project holds one school’s inputs and the timetable built from them.',
+    label: 'Project name',
+    placeholder: 'e.g. Term 2, 2026',
+    confirmLabel: 'Create project',
+    maxLength: 60
+  });
   if (!name) return;
-  const data = await apiFetch('/api/projects', { method: 'POST', body: JSON.stringify({ name }) });
-  if (!data || !data.success) { showToast('Could not create project'); return; }
-  closeNewModal();
-  sessionStorage.setItem('active_project_id', data.project.id);
-  location.href = 'index.html';
+
+  const data = await Schedura.api('/api/projects', { method: 'POST', body: JSON.stringify({ name }) });
+  if (!data.ok) { toast(data.error || 'Could not create project', { type: 'error' }); return; }
+  openProject(data.project.id);
 }
 
-// ── Rename ──
-let renamingId = null;
-function startRename(id, currentName) {
-  renamingId = id;
-  document.getElementById('renameInput').value = currentName;
-  document.getElementById('renameModal').classList.add('open');
-  setTimeout(() => document.getElementById('renameInput').focus(), 80);
-}
-function closeRenameModal() { document.getElementById('renameModal').classList.remove('open'); renamingId = null; }
+async function startRename(id, currentName) {
+  const name = await Schedura.promptText({
+    title: 'Rename project', label: 'Project name', value: currentName, confirmLabel: 'Rename', maxLength: 60
+  });
+  if (!name || name === currentName) return;
 
-async function confirmRename() {
-  const name = document.getElementById('renameInput').value.trim();
-  if (!name || !renamingId) return;
-  await apiFetch(`/api/projects/${renamingId}`, { method: 'PUT', body: JSON.stringify({ name }) });
-  closeRenameModal();
-  await loadAndRender();
-  showToast('Project renamed');
+  const prev = allProjects.find(p => p.id === id);
+  const data = await Schedura.api(`/api/projects/${id}`, { method: 'PUT', body: JSON.stringify({ name }) });
+  if (!data.ok) { toast(data.error || 'Could not rename', { type: 'error' }); return; }
+  if (prev) { prev.name = name; renderProjects(); }
+
+  toast(`Renamed to “${name}”`, {
+    action: 'Undo',
+    onAction: async () => {
+      await Schedura.api(`/api/projects/${id}`, { method: 'PUT', body: JSON.stringify({ name: currentName }) });
+      if (prev) { prev.name = currentName; renderProjects(); }
+    }
+  });
 }
 
-// ── Duplicate ──
 async function duplicateProject(id) {
-  const data = await apiFetch(`/api/projects/${id}`);
-  if (!data || !data.project) return;
+  const t = toast('Duplicating…', { duration: 20000 });
+  const data = await Schedura.api(`/api/projects/${id}`);
+  if (!data.ok || !data.project) { t.dismiss(); toast('Could not read that project', { type: 'error' }); return; }
   const p = data.project;
-  const created = await apiFetch('/api/projects', { method: 'POST', body: JSON.stringify({ name: p.name + ' (copy)' }) });
-  if (!created || !created.success) return;
-  await apiFetch(`/api/projects/${created.project.id}`, {
+
+  const created = await Schedura.api('/api/projects', { method: 'POST', body: JSON.stringify({ name: p.name + ' (copy)' }) });
+  if (!created.ok) { t.dismiss(); toast('Could not create the copy', { type: 'error' }); return; }
+
+  await Schedura.api(`/api/projects/${created.project.id}`, {
     method: 'PUT',
     body: JSON.stringify({
       standards: p.standards, faculty: p.faculty, assignments: p.assignments,
@@ -621,35 +408,132 @@ async function duplicateProject(id) {
       scheduleData: p.scheduleData, scheduleStats: p.scheduleStats, generatedFilename: p.generatedFilename
     })
   });
+  t.dismiss();
   await loadAndRender();
-  showToast('Project duplicated');
+  toast(`Copied to “${p.name} (copy)”`, { type: 'success' });
 }
 
-// ── Delete ──
+/**
+ * Deleting is a trash move, not an erase, so this can offer Undo rather than
+ * stopping to ask first. The project keeps its id — and therefore its URL and
+ * any share link — when it comes back.
+ */
 async function deleteProject(id) {
-  if (!confirm('Delete this project? This cannot be undone.')) return;
-  await apiFetch(`/api/projects/${id}`, { method: 'DELETE' });
+  const project = allProjects.find(p => p.id === id);
+  if (!project) return;
+
+  const data = await Schedura.api(`/api/projects/${id}`, { method: 'DELETE' });
+  if (!data.ok) { toast(data.error || 'Could not delete', { type: 'error' }); return; }
+
   allProjects = allProjects.filter(p => p.id !== id);
   renderProjects();
-  showToast('Project deleted');
+
+  toast(`“${project.name}” deleted`, {
+    action: 'Undo',
+    onAction: async () => {
+      const restored = await Schedura.api(`/api/projects/${id}/restore`, { method: 'POST' });
+      if (!restored.ok) { toast('Could not restore — it may have been erased', { type: 'error' }); return; }
+      await loadAndRender();
+      toast('Project restored', { type: 'success' });
+    }
+  });
 }
 
-// ── Toast ──
-function showToast(msg) {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2400);
+/* ── Share ───────────────────────────────────────────────────────────────── */
+
+async function openShare(id, name) {
+  const data = await Schedura.api(`/api/projects/${id}`);
+  if (!data.ok || !data.project) { toast('Could not read that project', { type: 'error' }); return; }
+
+  if (!data.project.scheduleData) {
+    toast('Generate a schedule first — there is nothing to share yet', { type: 'error' });
+    return;
+  }
+  renderShareModal(id, name, data.project.share || null);
 }
 
-function doLogout() {
-  sessionStorage.removeItem('auth_token');
-  sessionStorage.removeItem('auth_email');
-  sessionStorage.removeItem('active_project_id');
-  location.href = 'login.html';
+function shareUrl(share) { return `${location.origin}/s/${share.id}`; }
+
+function renderShareModal(id, name, share) {
+  const on = !!(share && share.enabled);
+  const m = Schedura.modal({
+    title: 'Share schedule',
+    html: `
+      <p style="font-size:13.5px;color:var(--muted);margin:0 0 18px;line-height:1.55">
+        Anyone with the link can view the generated timetable for
+        <strong style="color:var(--text)">${escHtml(name)}</strong> — read-only, no sign-in needed.
+        Your inputs and rules stay private.
+      </p>
+      <div id="shareBody"></div>`
+  });
+
+  const body = () => {
+    const el = m.root.querySelector('#shareBody');
+    if (on) {
+      el.innerHTML = `
+        <label for="shareInput">Public link</label>
+        <div class="share-link-row">
+          <input id="shareInput" type="text" readonly value="${escHtml(shareUrl(share))}">
+          <button class="btn btn-sm" id="copyShare">Copy</button>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-danger" id="offShare">Turn off link</button>
+          <button class="btn btn-primary" id="doneShare">Done</button>
+        </div>`;
+      el.querySelector('#copyShare').onclick = async () => {
+        const input = el.querySelector('#shareInput');
+        input.select();
+        try { await navigator.clipboard.writeText(input.value); toast('Link copied', { type: 'success' }); }
+        catch { document.execCommand('copy'); toast('Link copied', { type: 'success' }); }
+      };
+      el.querySelector('#offShare').onclick = async () => {
+        const r = await Schedura.api(`/api/projects/${id}/share`, { method: 'DELETE' });
+        if (!r.ok) { toast('Could not turn the link off', { type: 'error' }); return; }
+        m.close();
+        toast('Share link turned off');
+        loadAndRender();
+      };
+      el.querySelector('#doneShare').onclick = () => { m.close(); loadAndRender(); };
+    } else {
+      el.innerHTML = `
+        <div class="modal-actions">
+          <button class="btn" id="cancelShare">Cancel</button>
+          <button class="btn btn-primary" id="onShare">Create link</button>
+        </div>`;
+      el.querySelector('#cancelShare').onclick = () => m.close();
+      el.querySelector('#onShare').onclick = async () => {
+        const r = await Schedura.api(`/api/projects/${id}/share`, { method: 'POST' });
+        if (!r.ok) { toast('Could not create the link', { type: 'error' }); return; }
+        share = r.share;
+        renderShareModalAgain();
+      };
+    }
+  };
+
+  const renderShareModalAgain = () => { m.close(); renderShareModal(id, name, share); };
+  body();
 }
 
-loadAndRender();
+/* ── Boot ────────────────────────────────────────────────────────────────── */
+
+document.getElementById('newProjectBtn').onclick = createProject;
+document.getElementById('signOutBtn').onclick    = () => Schedura.auth.signOut();
+document.getElementById('searchInput').oninput   = renderProjects;
+
+// "/" focuses search, the way every list view worth using does.
+document.addEventListener('keydown', e => {
+  if (e.key === '/' && document.activeElement.tagName !== 'INPUT') {
+    e.preventDefault();
+    document.getElementById('searchInput').focus();
+  }
+  if (e.key === 'n' && (e.metaKey || e.ctrlKey) && !e.shiftKey) { e.preventDefault(); createProject(); }
+});
+
+(async () => {
+  if (!(await Schedura.auth.require())) return;
+  Schedura.paintUser();
+  loadAndRender();
+})();
 </script>
 </body>
 </html>

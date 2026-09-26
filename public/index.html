@@ -1,2808 +1,356 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8" />
-  <title>Schedura</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Schedura</title>
+  <meta name="description" content="Build a conflict-free school timetable, one step at a time." />
+  <meta name="robots" content="noindex" />
+  <meta name="theme-color" content="#FFFFFF" />
 
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@500;600&display=swap" rel="stylesheet"/>
-  <style>
-    :root {
-      /* Surfaces */
-      --bg:             #F5F2EB;
-      --surface:        #FFFFFF;
-      --surface-alt:    #FBF9F4;
-      --surface-sunken: #F0ECE2;
-
-      /* Lines */
-      --border:         #E0DACE;
-      --border-strong:  #C8C0AF;
-
-      /* Text */
-      --text:           #1F232B;
-      --text-secondary: #4A4F59;
-      --muted:          #7C776E;
-      --faint:          #A8A399;
-
-      /* Accent */
-      --accent:         #2C4A70;
-      --accent-hover:   #1E3553;
-      --accent-soft:    #ECF1F7;
-      --accent-border:  #C3D2E4;
-
-      /* Status */
-      --success:        #2A6B47;
-      --success-soft:   #EBF3EE;
-      --success-border: #BFD9CB;
-      --danger:         #A32B22;
-      --danger-soft:    #FAEDEC;
-      --danger-border:  #E6C5C2;
-      --warning:        #8A6318;
-      --warning-soft:   #FBF3E4;
-      --warning-border: #E8D9B6;
-
-      --radius:    6px;
-      --shadow-sm: 0 1px 2px rgba(31,35,43,0.05);
-      --shadow-md: 0 4px 14px rgba(31,35,43,0.10);
-    }
-
-    * {
-      box-sizing: border-box;
-      font-family: 'IBM Plex Sans', system-ui, sans-serif;
-    }
-
-    body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    h1, h2, h3, h4 { margin-top: 0; }
-
-    .container {
-      max-width: 1060px;
-      margin: auto;
-      padding: 32px 24px 64px;
-    }
-
-    /* ── Project bar ── */
-    .project-bar {
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      color: var(--text-secondary);
-      padding: 9px 24px;
-      font-size: 13px;
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      position: sticky;
-      top: 0;
-      z-index: 50;
-    }
-
-    .project-bar a {
-      color: var(--accent);
-      text-decoration: none;
-      font-weight: 500;
-    }
-
-    .project-bar a:hover { text-decoration: underline; }
-
-    .project-bar .divider { color: var(--border-strong); }
-    .project-bar .project-name { font-weight: 600; color: var(--text); }
-    .project-bar .save-status { margin-left: auto; color: var(--muted); font-size: 12px; }
-
-    /* ── Header ── */
-    .header {
-      text-align: center;
-      padding: 8px 0 28px;
-      margin-bottom: 28px;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .header h1 {
-      font-family: 'IBM Plex Serif', Georgia, serif;
-      font-size: 30px;
-      font-weight: 600;
-      letter-spacing: -0.01em;
-      margin-bottom: 8px;
-      color: var(--text);
-    }
-
-    .header p {
-      font-size: 14px;
-      color: var(--muted);
-      margin: 0;
-    }
-
-    /* ── Sections ── */
-    .section {
-      background: var(--surface);
-      padding: 22px;
-      border-radius: var(--radius);
-      margin-bottom: 20px;
-      border: 1px solid var(--border);
-      box-shadow: var(--shadow-sm);
-    }
-
-    .section-title {
-      margin-bottom: 18px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid var(--border);
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--text);
-      letter-spacing: -0.005em;
-    }
-
-    .section-subtitle {
-      font-size: 12.5px;
-      color: var(--muted);
-      margin: -10px 0 16px;
-      line-height: 1.5;
-    }
-
-    /* ── Form layout ── */
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 14px;
-    }
-
-    label {
-      font-size: 12px;
-      color: var(--text-secondary);
-      font-weight: 500;
-      display: block;
-      margin-bottom: 6px;
-    }
-
-    input, select {
-      width: 100%;
-      padding: 9px 11px;
-      border: 1px solid var(--border-strong);
-      border-radius: var(--radius);
-      font-size: 14px;
-      background: var(--surface);
-      color: var(--text);
-      transition: border-color .15s, box-shadow .15s;
-    }
-
-    input::placeholder { color: var(--faint); }
-
-    input:focus, select:focus {
-      outline: none;
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px var(--accent-soft);
-    }
-
-    select option { background: var(--surface); color: var(--text); }
-
-    .card {
-      border: 1px solid var(--border);
-      padding: 16px;
-      border-radius: var(--radius);
-      background: var(--surface-alt);
-      margin-bottom: 12px;
-      transition: border-color .15s;
-    }
-
-    .card:hover { border-color: var(--border-strong); }
-
-    .sub-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      padding: 12px;
-      border-radius: var(--radius);
-      margin-bottom: 10px;
-    }
-
-    .sub-card-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-bottom: 8px;
-    }
-
-    /* ── Buttons ── */
-    button {
-      padding: 9px 15px;
-      border: 1px solid transparent;
-      border-radius: var(--radius);
-      cursor: pointer;
-      font-weight: 500;
-      font-size: 13.5px;
-      font-family: inherit;
-      transition: background .15s, border-color .15s, color .15s;
-    }
-
-    button:disabled { opacity: 0.55; cursor: not-allowed; }
-
-    .btn-add {
-      background: var(--surface);
-      color: var(--accent);
-      border: 1px solid var(--accent-border);
-      margin-top: 10px;
-    }
-
-    .btn-add:hover:not(:disabled) { background: var(--accent-soft); border-color: var(--accent); }
-
-    .btn-generate {
-      background: var(--accent);
-      color: #fff;
-      border-color: var(--accent);
-      width: 100%;
-      font-size: 15px;
-      padding: 13px;
-      font-weight: 600;
-    }
-
-    .btn-generate:hover:not(:disabled) { background: var(--accent-hover); border-color: var(--accent-hover); }
-
-    .btn-secondary {
-      background: var(--surface);
-      color: var(--text-secondary);
-      border: 1px solid var(--border-strong);
-      margin-right: 8px;
-    }
-
-    .btn-secondary:hover:not(:disabled) {
-      background: var(--surface-sunken);
-      border-color: var(--muted);
-      color: var(--text);
-    }
-
-    .btn-remove {
-      background: var(--surface);
-      color: var(--danger);
-      border: 1px solid var(--danger-border);
-      padding: 6px 12px;
-      font-size: 12px;
-      margin-top: 10px;
-    }
-
-    .btn-remove:hover:not(:disabled) { background: var(--danger-soft); }
-
-    /* ── Checkbox group ── */
-    .checkbox-group {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    .checkbox-group label {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      margin-bottom: 0;
-      cursor: pointer;
-      font-weight: 400;
-      font-size: 13.5px;
-      color: var(--text-secondary);
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 8px 13px;
-      transition: border-color .15s, background .15s;
-    }
-
-    .checkbox-group label:hover { border-color: var(--border-strong); background: var(--surface-alt); }
-
-    .checkbox-group input[type="checkbox"] {
-      width: auto;
-      margin: 0;
-      cursor: pointer;
-      accent-color: var(--accent);
-    }
-
-    /* ── Time slots ── */
-    .time-slots-container {
-      background: var(--surface-alt);
-      padding: 18px;
-      border-radius: var(--radius);
-      border: 1px solid var(--border);
-    }
-
-    .time-slot-group {
-      margin-bottom: 16px;
-      padding-bottom: 16px;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .time-slot-group:last-child {
-      border-bottom: none;
-      margin-bottom: 0;
-      padding-bottom: 0;
-    }
-
-    /* ── Panels ── */
-    .panel {
-      padding: 16px;
-      background: var(--surface-alt);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-    }
-
-    .panel h3 {
-      margin: 0 0 6px 0;
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text);
-    }
-
-    .panel p.hint {
-      font-size: 12.5px;
-      color: var(--muted);
-      margin: 0 0 14px 0;
-      line-height: 1.5;
-    }
-
-    .constraint-group { margin-bottom: 24px; }
-
-    .constraint-group > h3 {
-      margin: 0 0 4px 0;
-      font-size: 14px;
-      font-weight: 600;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .constraint-group > h3 .tag {
-      font-size: 10.5px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: .04em;
-      padding: 2px 7px;
-      border-radius: 3px;
-    }
-
-    .tag-hard { background: var(--danger-soft);  color: var(--danger);  border: 1px solid var(--danger-border); }
-    .tag-soft { background: var(--success-soft); color: var(--success); border: 1px solid var(--success-border); }
-
-    .constraint-group > p {
-      font-size: 12.5px;
-      color: var(--muted);
-      margin: 0 0 12px 0;
-      line-height: 1.5;
-    }
-
-    /* ── Tables ── */
-    .table-wrapper {
-      width: 100%;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      min-width: 520px;
-    }
-
-    th, td {
-      border-bottom: 1px solid var(--border);
-      border-right: 1px solid var(--border);
-      padding: 10px 12px;
-      text-align: center;
-      font-size: 13px;
-      white-space: nowrap;
-    }
-
-    th:last-child, td:last-child { border-right: none; }
-    tr:last-child td { border-bottom: none; }
-
-    th {
-      background: var(--surface-sunken);
-      font-weight: 600;
-      color: var(--text-secondary);
-      font-size: 12px;
-      letter-spacing: .02em;
-    }
-
-    tbody tr:nth-child(even) { background: var(--surface-alt); }
-    tbody tr:nth-child(odd)  { background: var(--surface); }
-
-    .output-actions {
-      margin-top: 22px;
-      padding-top: 18px;
-      border-top: 1px solid var(--border);
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-    }
-
-    .export-btn-row {
-      display: flex;
-      gap: 7px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-
-    .output-block { margin: 24px 0; }
-
-    .output-block > h3 {
-      font-size: 14px;
-      font-weight: 600;
-      margin-bottom: 4px;
-      color: var(--text);
-    }
-
-    .output-block > p.hint {
-      font-size: 12.5px;
-      color: var(--muted);
-      margin: 0 0 12px 0;
-    }
-
-    .result-card {
-      margin: 0 0 16px 0;
-      padding: 16px;
-      background: var(--surface-alt);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-    }
-
-    .result-card h4 {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--text);
-      margin: 0 0 10px 0;
-    }
-
-    /* ── Loading ── */
-    .loading {
-      display: none;
-      text-align: center;
-      padding: 22px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      margin: 20px 0;
-      color: var(--text-secondary);
-      font-size: 14px;
-    }
-
-    .loading.active { display: block; }
-    .loading p { margin: 0; }
-
-    .spinner {
-      border: 3px solid var(--border);
-      border-top: 3px solid var(--accent);
-      border-radius: 50%;
-      width: 26px;
-      height: 26px;
-      animation: spin 0.8s linear infinite;
-      margin: 0 auto 12px;
-    }
-
-    @keyframes spin {
-      0%   { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-
-    /* ── Alerts ── */
-    .alert {
-      padding: 11px 14px;
-      margin: 14px 0;
-      border-radius: var(--radius);
-      display: none;
-      font-size: 13.5px;
-      line-height: 1.5;
-      white-space: pre-line;
-    }
-
-    .alert.active { display: block; }
-
-    .alert-success { background: var(--success-soft); color: var(--success); border: 1px solid var(--success-border); }
-    .alert-error   { background: var(--danger-soft);  color: var(--danger);  border: 1px solid var(--danger-border); }
-    .alert-info    { background: var(--accent-soft);  color: var(--accent);  border: 1px solid var(--accent-border); }
-
-    /* ── Output ── */
-    #outputSection { display: none; }
-
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 12px;
-      margin: 0 0 18px;
-    }
-
-    .stat-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      color: var(--text);
-      padding: 16px;
-      border-radius: var(--radius);
-      text-align: center;
-    }
-
-    .stat-card h3 {
-      margin: 0 0 8px 0;
-      font-size: 11.5px;
-      font-weight: 600;
-      color: var(--muted);
-      text-transform: uppercase;
-      letter-spacing: .05em;
-    }
-
-    .stat-card .value {
-      font-size: 26px;
-      font-weight: 600;
-      color: var(--accent);
-      font-family: 'IBM Plex Mono', monospace;
-    }
-
-    footer {
-      text-align: center;
-      font-size: 12.5px;
-      color: var(--muted);
-      margin: 44px 0 10px;
-    }
-
-    /* ── Mobile ── */
-    @media (max-width: 640px) {
-      .container { padding: 20px 14px 48px; }
-      .project-bar { padding: 9px 14px; }
-      .header { padding: 4px 0 20px; margin-bottom: 20px; }
-      .header h1 { font-size: 22px; }
-      .section { padding: 16px; }
-      .section-title { font-size: 14px; }
-      .grid { grid-template-columns: 1fr; }
-      .sub-card-grid { grid-template-columns: 1fr; }
-      .stats-grid { grid-template-columns: 1fr; }
-
-      th, td { padding: 8px 6px; font-size: 12px; }
-
-      .output-actions { justify-content: stretch; }
-
-      .output-actions .btn-secondary,
-      .export-btn-row .btn-secondary {
-        flex: 1 1 auto;
-        min-width: 0;
-        margin-right: 0;
-        text-align: center;
-        padding: 8px 10px;
-        font-size: 12px;
-      }
-
-      .btn-generate { font-size: 14px; padding: 12px; }
-    }
-  </style>
+  <link rel="stylesheet" href="/app.css" />
+  <link rel="stylesheet" href="/editor.css" />
 </head>
 
 <body>
-  <!-- ── PROJECT BAR (only shows when opened via dashboard) ── -->
-  <div id="projectBar" class="project-bar" style="display:none;">
-    <a href="dashboard.html">&larr; Projects</a>
-    <span class="divider">/</span>
-    <span id="projectBarName" class="project-name"></span>
-    <span id="saveStatus" class="save-status"></span>
+
+<!-- ── Top bar ───────────────────────────────────────────────────────────── -->
+<header class="topbar">
+  <a class="topbar-brand" href="/projects">Schedura</a>
+  <span class="topbar-sep">/</span>
+  <div class="topbar-context">
+    <span class="topbar-title" id="projectBarName">Loading…</span>
+    <button class="btn-icon" id="renameBtn" title="Rename project" aria-label="Rename project">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+    </button>
+    <span class="save-state" id="saveStatus" data-state="idle" aria-live="polite"></span>
+  </div>
+  <div class="topbar-right">
+    <button class="btn btn-sm" id="shareBtn" title="Share a read-only link">
+      <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 12v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7M16 6l-4-4-4 4M12 2v13"/></svg>
+      <span class="btn-label">Share</span>
+    </button>
+    <span class="topbar-user" id="topbarUser"></span>
+    <button class="btn btn-quiet btn-sm" id="signOutBtn">Sign out</button>
+  </div>
+</header>
+
+<!-- ── Stepper ───────────────────────────────────────────────────────────── -->
+<div class="stepper-wrap">
+  <nav class="stepper" id="stepper" aria-label="Setup steps"></nav>
+</div>
+
+<main class="container">
+
+  <div id="alertContainer"></div>
+
+  <!-- Shown while the project is still being fetched -->
+  <div id="bootSkeleton">
+    <div class="skeleton skeleton-line" style="width:180px;height:20px;margin-bottom:18px"></div>
+    <div class="skeleton skeleton-card" style="margin-bottom:12px"></div>
+    <div class="skeleton skeleton-card"></div>
   </div>
 
-  <div class="container">
-    <!-- Header -->
-    <div class="header">
-      <h1>Schedura</h1>
-      <p>Automated conflict-free schedule planning</p>
-    </div>
+  <div class="steps-viewport" id="stepsViewport" hidden>
 
-    <!-- Demo data -->
-    <div class="section" id="demoPanel">
-      <div class="section-title">Try it with sample data</div>
-      <p class="section-subtitle">Fills this project with a complete sample school — 6 standards, 3 divisions each, 27 teachers and a few realistic constraints — so you can see a full schedule without typing anything in.</p>
-      <button class="btn-add" style="margin-top:0;" id="demoBtn" onclick="fillDemoData()">Fill demo data</button>
-    </div>
+    <!-- ── 1 · Standards ─────────────────────────────────────────────────── -->
+    <section class="step-panel" data-step="standards" aria-labelledby="h-standards">
+      <div class="step-head">
+        <div class="step-eyebrow">Step 1 of 7</div>
+        <h2 id="h-standards">Standards and divisions</h2>
+        <p>Add each standard, how many divisions it has, and the courses every division studies. A division is the unit that gets scheduled — its students move together and it keeps one classroom all week.</p>
+      </div>
 
-    <!-- Standards Section -->
-    <div class="section">
-      <div class="section-title">Standards &amp; Courses</div>
-      <p class="section-subtitle">Add each standard and the courses it needs to attend.</p>
+      <!-- Only shown while the project is still empty -->
+      <div class="panel demo-panel" id="demoPanel" style="display:none">
+        <h3>Start from a sample school</h3>
+        <p class="hint">Fills this project with a complete example — 6 standards, 3 divisions each, 27 teachers, 18 classrooms and a few realistic rules — so you can see a finished timetable without typing anything in.</p>
+        <button class="btn btn-outline" id="demoBtn">Fill with sample data</button>
+      </div>
+
       <div id="standardsContainer"></div>
-      <button class="btn-add" onclick="addStandard()">+ Add standard</button>
-    </div>
 
-    <!-- Faculty Section -->
-    <div class="section">
-      <div class="section-title">Faculty</div>
-      <p class="section-subtitle">Add the people who will be teaching these courses.</p>
-      <div id="facultyContainer"></div>
-      <button class="btn-add" onclick="addFaculty()">+ Add faculty</button>
-    </div>
+      <div class="empty" id="standardsEmpty" style="display:none">
+        <svg width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M2 7l10-4 10 4-10 4Z"/><path d="M6 10v6c0 1.5 2.7 3 6 3s6-1.5 6-3v-6"/></svg>
+        <h3>No standards yet</h3>
+        <p>Start with one standard — say “1st” — and give it as many divisions as it has sections. A classroom is set aside for each division automatically.</p>
+        <div class="empty-actions">
+          <button class="btn btn-primary" onclick="addStandard()">Add your first standard</button>
+          <button class="btn" id="demoBtnEmpty">Use sample data instead</button>
+        </div>
+      </div>
 
-    <!-- Classrooms Section -->
-    <div class="section">
-      <div class="section-title">Classrooms</div>
-      <p class="section-subtitle">List the rooms available for classes to be scheduled into.</p>
+      <button class="btn btn-outline" style="margin-top:12px" onclick="addStandard()">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        Add standard
+      </button>
+
+      <div class="step-nav" data-nav></div>
+    </section>
+
+    <!-- ── 2 · Classrooms ────────────────────────────────────────────────── -->
+    <section class="step-panel" data-step="classrooms" aria-labelledby="h-classrooms">
+      <div class="step-head">
+        <div class="step-eyebrow">Step 2 of 7</div>
+        <h2 id="h-classrooms">Classrooms</h2>
+        <p>One room per division, created for you as you add divisions. Rename them to match your building, or add spares.</p>
+      </div>
+
+      <div id="roomAllocation" class="panel" style="margin-bottom:16px"></div>
+
       <div id="roomContainer"></div>
-      <button class="btn-add" onclick="addRoom()">+ Add classroom</button>
-    </div>
 
-    <!-- Time Slots Section -->
-    <div class="section">
-      <div class="section-title">Time Slots</div>
-      <p class="section-subtitle">Define the periods of the day that classes can occupy.</p>
-      <div class="time-slots-container">
-        <div id="timeSlots"></div>
-        <button class="btn-add" onclick="addTimeSlot()">+ Add time slot</button>
+      <div class="empty" id="roomsEmpty" style="display:none">
+        <svg width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M3 21V8l9-5 9 5v13"/><path d="M9 21v-7h6v7"/></svg>
+        <h3>No classrooms yet</h3>
+        <p>Rooms appear here automatically when you add divisions. You can also add them by hand.</p>
+        <div class="empty-actions"><button class="btn btn-primary" onclick="addRoom()">Add a classroom</button></div>
       </div>
-    </div>
 
-    <!-- Days Section -->
-    <div class="section">
-      <div class="section-title">Working Days</div>
-      <p class="section-subtitle">Select the days that should be included in the schedule.</p>
-      <div class="checkbox-group" id="daysCheckboxes">
-        <label><input type="checkbox" value="Monday" onchange="updateDays()"> Monday</label>
-        <label><input type="checkbox" value="Tuesday" onchange="updateDays()"> Tuesday</label>
-        <label><input type="checkbox" value="Wednesday" onchange="updateDays()"> Wednesday</label>
-        <label><input type="checkbox" value="Thursday" onchange="updateDays()"> Thursday</label>
-        <label><input type="checkbox" value="Friday" onchange="updateDays()"> Friday</label>
-        <label><input type="checkbox" value="Saturday" onchange="updateDays()"> Saturday</label>
-        <label><input type="checkbox" value="Sunday" onchange="updateDays()"> Sunday</label>
+      <button class="btn btn-outline" style="margin-top:12px" onclick="addRoom()">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        Add classroom
+      </button>
+
+      <div class="step-nav" data-nav></div>
+    </section>
+
+    <!-- ── 3 · Teachers ──────────────────────────────────────────────────── -->
+    <section class="step-panel" data-step="teachers" aria-labelledby="h-teachers">
+      <div class="step-head">
+        <div class="step-eyebrow">Step 3 of 7</div>
+        <h2 id="h-teachers">Teachers</h2>
+        <p>Everyone who will be teaching. A teacher can take the same course for several divisions — you will pair them up in step 5.</p>
       </div>
-    </div>
 
-    <!-- Course Assignments Section -->
-    <div class="section">
-      <div class="section-title">Course Assignments</div>
-      <p class="section-subtitle">Pick the teacher for each course in each division, and how many times a week it meets. The same teacher can take a course for several divisions.</p>
-      <div id="assignmentMatrix"></div>
-    </div>
+      <div id="facultyContainer"></div>
 
-    <!-- Constraints Section -->
-    <div class="section">
-      <div class="section-title">Constraints</div>
+      <div class="empty" id="facultyEmpty" style="display:none">
+        <svg width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>
+        <h3>No teachers yet</h3>
+        <p>Add each teacher with a short code — the code is what appears in timetable cells where a full name would not fit.</p>
+        <div class="empty-actions"><button class="btn btn-primary" onclick="addFaculty()">Add your first teacher</button></div>
+      </div>
 
-      <!-- Break Time -->
-      <div class="panel" style="margin-bottom:24px;">
-        <h3>Break Time</h3>
-        <p class="hint">Sets the boundary between the first and second half of the day, which the constraints below rely on.</p>
+      <button class="btn btn-outline" style="margin-top:12px" onclick="addFaculty()">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        Add teacher
+      </button>
+
+      <div class="step-nav" data-nav></div>
+    </section>
+
+    <!-- ── 4 · Timetable shape ───────────────────────────────────────────── -->
+    <section class="step-panel" data-step="timetable" aria-labelledby="h-timetable">
+      <div class="step-head">
+        <div class="step-eyebrow">Step 4 of 7</div>
+        <h2 id="h-timetable">The school week</h2>
+        <p>Which days you run, the periods in a day, and when the break falls. Everything after this is fitted into the grid you set here.</p>
+      </div>
+
+      <div class="block">
+        <h3>Working days</h3>
+        <p class="hint">Days that can hold classes.</p>
+        <div class="checkbox-group" id="daysCheckboxes">
+          <label><input type="checkbox" value="Monday" onchange="updateDays()"> Monday</label>
+          <label><input type="checkbox" value="Tuesday" onchange="updateDays()"> Tuesday</label>
+          <label><input type="checkbox" value="Wednesday" onchange="updateDays()"> Wednesday</label>
+          <label><input type="checkbox" value="Thursday" onchange="updateDays()"> Thursday</label>
+          <label><input type="checkbox" value="Friday" onchange="updateDays()"> Friday</label>
+          <label><input type="checkbox" value="Saturday" onchange="updateDays()"> Saturday</label>
+          <label><input type="checkbox" value="Sunday" onchange="updateDays()"> Sunday</label>
+        </div>
+      </div>
+
+      <div class="block">
+        <h3>Periods</h3>
+        <p class="hint">The slots of the day a class can occupy. Every division uses the same grid.</p>
+        <div class="time-slots-container">
+          <div id="timeSlots"></div>
+          <button class="btn btn-outline btn-sm" style="margin-top:10px" onclick="addTimeSlot()">
+            <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            Add period
+          </button>
+        </div>
+      </div>
+
+      <div class="block">
+        <h3>Break</h3>
+        <p class="hint">Sets the line between the first and second half of the day, which the rules in step 6 depend on.</p>
         <div style="display:flex; gap:18px; flex-wrap:wrap; align-items:flex-end;">
           <div>
-            <label for="breakStartInput">Break starts at</label>
+            <label for="breakStartInput">Break starts</label>
             <input type="time" id="breakStartInput" style="width:150px;" onchange="updateBreakTime()">
           </div>
           <div>
-            <label for="breakEndInput">Break ends at</label>
+            <label for="breakEndInput">Break ends</label>
             <input type="time" id="breakEndInput" style="width:150px;" onchange="updateBreakTime()">
           </div>
           <div style="font-size:12.5px; color:var(--muted); padding-bottom:9px;">
-            Slots starting before the break count as the <strong style="color:var(--text);">first half</strong>.
+            Periods starting before the break count as the <strong style="color:var(--text);">first half</strong>.
           </div>
         </div>
       </div>
 
-      <!-- Hard Constraints -->
+      <div class="step-nav" data-nav></div>
+    </section>
+
+    <!-- ── 5 · Assignments ───────────────────────────────────────────────── -->
+    <section class="step-panel" data-step="assignments" aria-labelledby="h-assignments">
+      <div class="step-head">
+        <div class="step-eyebrow">Step 5 of 7</div>
+        <h2 id="h-assignments">Who teaches what</h2>
+        <p>Pick the teacher for each course in each division, and how many periods a week it needs. Leave a cell empty to skip that course for that division.</p>
+      </div>
+
+      <div id="assignmentMatrix"></div>
+
+      <div class="step-nav" data-nav></div>
+    </section>
+
+    <!-- ── 6 · Rules ─────────────────────────────────────────────────────── -->
+    <section class="step-panel" data-step="rules" aria-labelledby="h-rules">
+      <div class="step-head">
+        <div class="step-eyebrow">Step 6 of 7</div>
+        <h2 id="h-rules">Rules and preferences</h2>
+        <p>Optional. Hard rules a timetable must obey, and soft preferences it should satisfy where it can.</p>
+      </div>
+
       <div class="constraint-group">
-        <h3>Hard constraints <span class="tag tag-hard">Required</span></h3>
-        <p>These must be satisfied — a schedule that breaks any of them is rejected.</p>
+        <h3>Hard rules <span class="tag tag-hard">Required</span></h3>
+        <p>Must be satisfied — a timetable that breaks any of these is rejected outright.</p>
         <div id="hardConstraintsContainer"></div>
-        <button class="btn-add" onclick="addHardConstraint()">+ Add hard constraint</button>
+        <button class="btn btn-outline btn-sm" style="margin-top:10px" onclick="addHardConstraint()">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          Add hard rule
+        </button>
       </div>
 
-      <!-- Soft Constraints -->
-      <div class="constraint-group" style="margin-bottom:0;">
-        <h3>Soft constraints <span class="tag tag-soft">Preferred</span></h3>
-        <p>These are optimised for where possible, but will not invalidate a schedule.</p>
+      <div class="constraint-group" style="margin-bottom:0">
+        <h3>Soft preferences <span class="tag tag-soft">Preferred</span></h3>
+        <p>Optimised for where possible, but they never invalidate a timetable.</p>
         <div id="softConstraintsContainer"></div>
-        <button class="btn-add" onclick="addSoftConstraint()">+ Add soft constraint</button>
-      </div>
-    </div>
-
-    <!-- Alert Container -->
-    <div id="alertContainer"></div>
-
-    <!-- Generate Button -->
-    <div style="margin: 26px 0;">
-      <button class="btn-generate" id="generateBtn" onclick="generateTimetable()">Generate schedule</button>
-    </div>
-
-    <!-- Loading Indicator -->
-    <div class="loading" id="loadingIndicator">
-      <div class="spinner"></div>
-      <p id="loadingHeadline">Generating your schedule, please wait…</p>
-      <p id="generationCount" style="font-size:12px; color:var(--muted); margin-top:6px;"></p>
-      <button class="btn-secondary" id="cancelBtn" style="margin-top:14px; margin-right:0;" onclick="cancelGeneration()">Cancel</button>
-    </div>
-
-    <!-- Slow-run advice. Kept on screen after cancelling so the suggestions can
-         be acted on, then regenerated. -->
-    <div id="slowPanel" style="display:none;"></div>
-
-    <!-- Output Section -->
-    <div id="outputSection" class="section">
-      <div class="section-title">Generated Schedule</div>
-
-      <!-- Soft-constraint score + the option to trade more time for a better one -->
-      <div class="output-block" id="preferencesBlock" style="display:none;">
-        <h3>Preferences</h3>
-        <p class="hint" id="preferenceSummary"></p>
-        <button class="btn-secondary" id="improveBtn" style="width:auto;margin-right:0;" onclick="improveSchedule()">Improve schedule</button>
-        <div id="improveComparison"></div>
+        <button class="btn btn-outline btn-sm" style="margin-top:10px" onclick="addSoftConstraint()">
+          <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+          Add soft preference
+        </button>
       </div>
 
-      <div class="output-block">
-        <h3>Master schedule</h3>
-        <p class="hint">Every scheduled class across all standards and days.</p>
-        <div id="previewContainer"></div>
+      <div class="step-nav" data-nav></div>
+    </section>
+
+    <!-- ── 7 · Schedule ──────────────────────────────────────────────────── -->
+    <section class="step-panel" data-step="schedule" aria-labelledby="h-schedule">
+      <div class="step-head">
+        <div class="step-eyebrow">Step 7 of 7</div>
+        <h2 id="h-schedule">Schedule</h2>
+        <p>Generate a week that satisfies every hard rule, then share or export it.</p>
       </div>
 
-      <div class="output-block">
-        <h3>Division timetables</h3>
-        <p class="hint">A week view for each division, with export options.</p>
-        <div id="standardTimetablesContainer"></div>
+      <!-- Readiness summary + last run -->
+      <div id="readyPanel"></div>
+
+      <div style="margin: 20px 0;">
+        <button class="btn btn-primary btn-lg" id="generateBtn" style="width:100%" onclick="generateTimetable()">Generate schedule</button>
       </div>
 
-      <div class="output-block">
-        <h3>Faculty timetables</h3>
-        <p class="hint">Select a faculty member to view their weekly schedule.</p>
-        <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:14px;">
-          <div style="flex:1; min-width:200px;">
-            <label for="facultyTimetableSelect">Faculty member</label>
-            <select id="facultyTimetableSelect" style="width:100%;">
-              <option value="">Choose a faculty member</option>
-            </select>
-          </div>
-          <button class="btn-add" onclick="showFacultyTimetable()" style="margin-top:0; height:38px;">View timetable</button>
+      <div class="loading" id="loadingIndicator">
+        <div class="spinner"></div>
+        <p id="loadingHeadline">Generating your schedule…</p>
+        <p id="generationCount" style="font-size:12px; color:var(--muted); margin-top:6px;"></p>
+        <button class="btn btn-sm" id="cancelBtn" style="margin-top:14px" onclick="cancelGeneration()">Cancel</button>
+      </div>
+
+      <!-- Slow-run advice. Stays on screen after cancelling so the suggestions
+           can be acted on, then regenerated. -->
+      <div id="slowPanel" style="display:none;"></div>
+
+      <div id="outputSection">
+        <div class="output-block" id="preferencesBlock" style="display:none;">
+          <h3>Preferences</h3>
+          <p class="hint" id="preferenceSummary"></p>
+          <button class="btn" id="improveBtn" onclick="improveSchedule()">Improve schedule</button>
+          <div id="improveComparison"></div>
         </div>
-        <div id="facultyTimetablesContainer"></div>
-      </div>
 
-      <div class="output-block">
-        <button class="btn-secondary" onclick="toggleMoreDetails()" style="width:auto; margin-right:0;">Show run details</button>
-        <div id="moreDetailsSection" style="display:none; margin-top:14px; padding:16px; background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--radius);">
-          <div class="stats-grid">
-            <div class="stat-card">
-              <h3>Scheduling conflicts</h3>
-              <div class="value" id="conflictCount">0</div>
-            </div>
-            <div class="stat-card">
-              <h3>Fitness score</h3>
-              <div class="value" id="fitnessScore">0</div>
-            </div>
-            <div class="stat-card">
-              <h3>Total classes</h3>
-              <div class="value" id="classCount">0</div>
+        <div class="output-block">
+          <h3>Master schedule</h3>
+          <p class="hint">Every scheduled class, across all divisions and days.</p>
+          <div id="previewContainer"></div>
+        </div>
+
+        <div class="output-block">
+          <h3>Division timetables</h3>
+          <p class="hint">A week view for each division, with export options.</p>
+          <div id="standardTimetablesContainer"></div>
+        </div>
+
+        <div class="output-block">
+          <h3>Teacher timetables</h3>
+          <p class="hint">Pick a teacher to see their week.</p>
+          <div style="display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; margin-bottom:14px;">
+            <div style="flex:1; min-width:200px;">
+              <label for="facultyTimetableSelect">Teacher</label>
+              <select id="facultyTimetableSelect" onchange="showFacultyTimetable()">
+                <option value="">Choose a teacher</option>
+              </select>
             </div>
           </div>
+          <div id="facultyTimetablesContainer"></div>
+        </div>
 
-          <div id="softReportSection" style="margin-top:18px; display:none;">
-            <h4 style="color:var(--text); margin:0 0 10px 0; font-size:13px;">Soft constraint results</h4>
-            <div id="softReportList"></div>
-          </div>
+        <div class="output-block">
+          <h3>Run history</h3>
+          <p class="hint">The last few times this timetable was generated.</p>
+          <div id="runHistory"></div>
+        </div>
 
-          <div style="margin-top:16px;">
-            <h4 style="color:var(--text); margin:0 0 10px 0; font-size:13px;">Hard constraint status</h4>
-            <div id="hardConstraintStatus"></div>
+        <div class="output-block">
+          <button class="btn btn-sm" onclick="toggleMoreDetails()">Show run details</button>
+          <div id="moreDetailsSection" style="display:none; margin-top:14px; padding:16px; background:var(--surface-alt); border:1px solid var(--border); border-radius:var(--radius);">
+            <div class="stats-grid">
+              <div class="stat-card">
+                <h3>Scheduling conflicts</h3>
+                <div class="value" id="conflictCount">0</div>
+              </div>
+              <div class="stat-card">
+                <h3>Fitness score</h3>
+                <div class="value" id="fitnessScore">0</div>
+              </div>
+              <div class="stat-card">
+                <h3>Total classes</h3>
+                <div class="value" id="classCount">0</div>
+              </div>
+            </div>
+
+            <div id="softReportSection" style="margin-top:18px; display:none;">
+              <h4 style="color:var(--text); margin:0 0 10px 0; font-size:13px;">Soft preference results</h4>
+              <div id="softReportList"></div>
+            </div>
+
+            <div style="margin-top:16px;">
+              <h4 style="color:var(--text); margin:0 0 10px 0; font-size:13px;">Hard rule status</h4>
+              <div id="hardConstraintStatus"></div>
+            </div>
           </div>
+        </div>
+
+        <div class="output-actions">
+          <button class="btn btn-sm" onclick="downloadExcel()">Excel</button>
+          <button class="btn btn-sm" onclick="downloadAsPdf()">PDF</button>
+          <button class="btn btn-sm" onclick="downloadAsImage()">Image</button>
+          <button class="btn btn-sm btn-danger" onclick="resetForm()">Clear everything</button>
         </div>
       </div>
 
-      <div class="output-actions">
-        <button class="btn-secondary" onclick="downloadExcel()">Download Excel</button>
-        <button class="btn-secondary" onclick="downloadAsPdf()">Download PDF</button>
-        <button class="btn-secondary" onclick="downloadAsImage()">Download image</button>
-        <button class="btn-secondary" onclick="resetForm()">Start over</button>
-      </div>
-    </div>
+      <div class="step-nav" data-nav></div>
+    </section>
 
-    <footer>
-      <p>Schedura &middot; Automated schedule planning</p>
-    </footer>
   </div>
+</main>
 
-  <script>
-    const API_BASE_URL = '';  // relative — works on any host
-
-    // Date.now() alone can collide when two items are added within the same
-    // millisecond (e.g. scripted/bulk adds), which breaks id-based lookups
-    // and DOM ids. Always mix in a random suffix for uniqueness.
-    function uid(prefix) {
-      return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    }
-
-    // ── Auth ──
-    const AUTH_TOKEN = sessionStorage.getItem('auth_token');
-    const AUTH_EMAIL = sessionStorage.getItem('auth_email');
-    const PROJ_ID    = sessionStorage.getItem('active_project_id');
-
-    if (!AUTH_TOKEN) {
-      location.href = '/login.html';
-    }
-
-    async function authFetch(url, opts = {}) {
-      const res = await fetch(url, { ...opts, headers: { ...(opts.headers||{}), 'Authorization': `Bearer ${AUTH_TOKEN}` } });
-      if (res.status === 401) {
-        // Session expired/invalid — stop letting every subsequent action fail
-        // silently and send the user back to sign in.
-        sessionStorage.removeItem('auth_token');
-        sessionStorage.removeItem('auth_email');
-        sessionStorage.removeItem('active_project_id');
-        location.href = '/login.html';
-        return res;
-      }
-      return res;
-    }
-
-    // ── Auto-save ──
-    let _saveTimer = null;
-    function markDirty() {
-      const s = document.getElementById('saveStatus');
-      if (s) s.textContent = '● Unsaved';
-      clearTimeout(_saveTimer);
-      _saveTimer = setTimeout(autoSave, 2000);
-    }
-    async function autoSave() {
-      if (!PROJ_ID) return;
-      const s = document.getElementById('saveStatus');
-      if (s) s.textContent = '↑ Saving…';
-      try {
-        const res = await authFetch(`${API_BASE_URL}/api/projects/${PROJ_ID}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ standards, faculty, assignments, classrooms: getClassrooms(), selectedDays, timeSlotValues, hardConstraints, softConstraints, breakTime })
-        });
-        const data = await res.json();
-        if (!res.ok || !data.success) {
-          if (s) s.textContent = 'Save failed';
-          showAlert(data.error || 'Save failed', 'error');
-        } else {
-          if (s) s.textContent = 'Saved';
-          setTimeout(() => { if (s) s.textContent = ''; }, 2000);
-        }
-      } catch(e) {
-        if (s) s.textContent = 'Save failed';
-      }
-    }
-
-    // Data structures
-    // standards[].divisions = [{ id, label, roomId }] — a division is the unit that
-    // gets scheduled: its students move together and it owns one classroom.
-    let standards = [];
-    let faculty = [];
-    let assignments = [];   // { id, divisionId, courseId, facultyId, timesPerWeek }
-    let classrooms = [];    // { id, name }
-    let selectedDays = [];
-    let timeSlots = [];
-    let timeSlotsCount = 1;
-    let timeSlotValues = [{ startTime: '', endTime: '' }];
-    let generatedFilename = null;
-    let currentScheduleData = null;
-    let hardConstraints = [];
-    let softConstraints = [];
-    let breakTime = { start: '', end: '' };
-
-    // Utility function to show alerts
-    function showAlert(message, type = 'success') {
-      const container = document.getElementById('alertContainer');
-      const alert = document.createElement('div');
-      alert.className = `alert alert-${type} active`;
-      alert.textContent = message;
-      container.appendChild(alert);
-
-      setTimeout(() => {
-        alert.remove();
-      }, 5000);
-    }
-
-    // Classrooms are objects ({ id, name }) because divisions reference a room by
-    // id — pinning by name would break the link the moment a room is renamed.
-    function getClassrooms() {
-      return classrooms.filter(r => r.name && r.name.trim());
-    }
-
-    function classroomName(roomId) {
-      const room = classrooms.find(r => r.id === roomId);
-      return room ? room.name : '';
-    }
-
-    /** All division objects across every standard, flattened. */
-    function allDivisions() {
-      return standards.flatMap(std =>
-        (std.divisions || []).map(d => ({ ...d, standardId: std.id, standardName: std.name }))
-      );
-    }
-
-    /** Display name for a division, e.g. "1st-A". */
-    function divisionName(division, standard) {
-      const std = standard || standards.find(s => (s.divisions || []).some(d => d.id === division.id));
-      return `${std ? std.name : ''}-${division.label}`;
-    }
-
-    /** First classroom not already claimed by a division, or null. */
-    function nextFreeRoomId() {
-      const taken = new Set(allDivisions().map(d => d.roomId).filter(Boolean));
-      const free  = classrooms.find(r => !taken.has(r.id));
-      return free ? free.id : null;
-    }
-
-    // Update selected days
-    function updateDays() {
-      const checkboxes = document.querySelectorAll('#daysCheckboxes input[type="checkbox"]');
-      selectedDays = Array.from(checkboxes).filter(cb => cb.checked).map(cb => cb.value);
-      markDirty();
-    }
-
-    // Standards Management
-    // NOTE: all handlers below look up standards/courses by their stable `id`,
-    // never by array index — indices baked into onclick/onchange attributes go
-    // stale as soon as an earlier item in the list is removed.
-    /** Next division label: A, B, C … then A2, B2 … if a school ever needs >26. */
-    function nextDivisionLabel(standard) {
-      const used = new Set((standard.divisions || []).map(d => d.label));
-      for (let i = 0; i < 26; i++) {
-        const label = String.fromCharCode(65 + i);
-        if (!used.has(label)) return label;
-      }
-      return 'D' + ((standard.divisions || []).length + 1);
-    }
-
-    // One renderer for a standard card, used both when adding a new one and when
-    // restoring a saved project — keeping two copies of this template in sync is
-    // what caused the stale-index bug previously.
-    function renderStandardCard(standard) {
-      const container = document.getElementById('standardsContainer');
-      document.getElementById(standard.id)?.remove();
-
-      const card = document.createElement('div');
-      card.className = 'card';
-      card.id = standard.id;
-      card.innerHTML = `
-        <div class="grid">
-          <div>
-            <label>Standard name</label>
-            <input type="text" value="${esc(standard.name)}" placeholder="e.g. 1st"
-              onchange="updateStandardName('${standard.id}', this.value)">
-          </div>
-          <div>
-            <label>Number of divisions</label>
-            <input type="number" min="1" max="26" value="${(standard.divisions || []).length || 1}"
-              onchange="setDivisionCount('${standard.id}', parseInt(this.value))">
-          </div>
-        </div>
-
-        <div id="${standard.id}-divisions" style="margin-top:14px;"></div>
-
-        <div style="margin-top: 16px;">
-          <p style="margin:0 0 8px 0; font-weight:600; font-size:13px; color:var(--text);">Courses</p>
-          <p style="margin:0 0 10px 0; font-size:12px; color:var(--muted);">Every division of this standard studies these courses.</p>
-          <div id="${standard.id}-courses"></div>
-          <button class="btn-add" style="margin-top: 10px;" onclick="addCourse('${standard.id}')">+ Add course</button>
-        </div>
-
-        <button class="btn-remove" onclick="removeStandard('${standard.id}')">Remove standard</button>
-      `;
-      container.appendChild(card);
-
-      renderStandardDivisions(standard.id);
-      (standard.courses || []).forEach(c => renderCourseCard(standard.id, c));
-    }
-
-    function addStandard() {
-      const standardId = uid('standard');
-      standards.push({
-        id: standardId,
-        name: '',
-        courses: [],
-        divisions: [{ id: uid('div'), label: 'A', roomId: nextFreeRoomId() }]
-      });
-      renderStandardCard(standards[standards.length - 1]);
-      renderAssignmentMatrix();
-      markDirty();
-    }
-
-    function updateStandardName(standardId, name) {
-      const standard = standards.find(s => s.id === standardId);
-      if (!standard) return;
-      standard.name = name;
-      renderStandardDivisions(standardId);  // division labels show "1st-A"
-      renderAssignmentMatrix();
-      refreshConstraintDropdowns();
-      markDirty();
-    }
-
-    // ── Divisions ───────────────────────────────────────────────────────
-    function renderStandardDivisions(standardId) {
-      const standard = standards.find(s => s.id === standardId);
-      const host = document.getElementById(`${standardId}-divisions`);
-      if (!standard || !host) return;
-
-      const takenElsewhere = new Set(
-        allDivisions().filter(d => d.standardId !== standardId).map(d => d.roomId).filter(Boolean)
-      );
-
-      const rows = (standard.divisions || []).map(d => {
-        const options = ['<option value="">No classroom</option>'].concat(
-          classrooms.map(r => {
-            const usedByOther = takenElsewhere.has(r.id) ||
-              (standard.divisions || []).some(o => o.id !== d.id && o.roomId === r.id);
-            return `<option value="${r.id}" ${r.id === d.roomId ? 'selected' : ''} ${usedByOther ? 'disabled' : ''}>${esc(r.name)}${usedByOther ? ' — taken' : ''}</option>`;
-          })
-        ).join('');
-
-        return `
-          <div style="display:flex; gap:10px; align-items:flex-end; margin-bottom:8px; flex-wrap:wrap;">
-            <div style="width:110px;">
-              <label>Division</label>
-              <input type="text" value="${esc(d.label)}" maxlength="6"
-                onchange="updateDivisionLabel('${standardId}','${d.id}',this.value)">
-            </div>
-            <div style="flex:1; min-width:170px;">
-              <label>Classroom${standard.name ? ` for ${esc(standard.name)}-${esc(d.label)}` : ''}</label>
-              <select onchange="updateDivisionRoom('${standardId}','${d.id}',this.value)">${options}</select>
-            </div>
-          </div>`;
-      }).join('');
-
-      const shortfall = allDivisions().length - classrooms.length;
-      const warning = shortfall > 0
-        ? `<p style="margin:4px 0 0 0; font-size:12px; color:var(--danger);">${shortfall} more classroom${shortfall > 1 ? 's' : ''} needed — every division must have its own room.</p>`
-        : '';
-
-      host.innerHTML = `
-        <p style="margin:0 0 8px 0; font-weight:600; font-size:13px; color:var(--text);">Divisions</p>
-        <p style="margin:0 0 10px 0; font-size:12px; color:var(--muted);">Each division stays in its own classroom all week.</p>
-        ${rows}${warning}`;
-    }
-
-    /** Grow or shrink a standard's divisions to `count`, auto-claiming free rooms. */
-    function setDivisionCount(standardId, count) {
-      const standard = standards.find(s => s.id === standardId);
-      if (!standard) return;
-      if (isNaN(count) || count < 1) count = 1;
-      if (count > 26) count = 26;
-
-      const divisions = standard.divisions || (standard.divisions = []);
-
-      while (divisions.length < count) {
-        divisions.push({ id: uid('div'), label: nextDivisionLabel(standard), roomId: nextFreeRoomId() });
-      }
-
-      while (divisions.length > count) {
-        const removed = divisions[divisions.length - 1];
-        const used = assignments.some(a => a.divisionId === removed.id);
-        if (used && !confirm(`${standard.name || 'This standard'}-${removed.label} has teachers assigned. Remove it anyway?`)) {
-          break;
-        }
-        divisions.pop();
-        // Drop assignments that belonged to the removed division
-        for (let i = assignments.length - 1; i >= 0; i--) {
-          if (assignments[i].divisionId === removed.id) assignments.splice(i, 1);
-        }
-      }
-
-      // Reflect any clamping back into the input
-      const input = document.querySelector(`#${CSS.escape(standardId)} input[type="number"]`);
-      if (input) input.value = divisions.length;
-
-      renderStandardDivisions(standardId);
-      renderAssignmentMatrix();
-      markDirty();
-    }
-
-    function updateDivisionLabel(standardId, divisionId, label) {
-      const standard = standards.find(s => s.id === standardId);
-      const division = standard && (standard.divisions || []).find(d => d.id === divisionId);
-      if (!division) return;
-      division.label = (label || '').trim() || division.label;
-      renderStandardDivisions(standardId);
-      renderAssignmentMatrix();
-      markDirty();
-    }
-
-    function updateDivisionRoom(standardId, divisionId, roomId) {
-      const standard = standards.find(s => s.id === standardId);
-      const division = standard && (standard.divisions || []).find(d => d.id === divisionId);
-      if (!division) return;
-      division.roomId = roomId || null;
-      // A room can serve only one division — re-render every standard so the
-      // "taken" markers stay accurate across cards.
-      standards.forEach(s => renderStandardDivisions(s.id));
-      markDirty();
-    }
-
-    // ── Courses ─────────────────────────────────────────────────────────
-    function renderCourseCard(standardId, course) {
-      const container = document.getElementById(`${standardId}-courses`);
-      if (!container) return;
-      document.getElementById(course.id)?.remove();
-
-      const sub = document.createElement('div');
-      sub.className = 'sub-card';
-      sub.id = course.id;
-      sub.innerHTML = `
-        <div class="sub-card-grid">
-          <div>
-            <label>Course name</label>
-            <input type="text" value="${esc(course.name)}" placeholder="e.g. Mathematics"
-              onchange="updateCourseName('${standardId}', '${course.id}', 'name', this.value)">
-          </div>
-          <div>
-            <label>Course code</label>
-            <input type="text" value="${esc(course.courseCode)}" placeholder="e.g. MATH101"
-              onchange="updateCourseName('${standardId}', '${course.id}', 'courseCode', this.value)">
-          </div>
-        </div>
-        <button class="btn-remove" style="font-size: 11px; padding: 4px 8px;"
-          onclick="removeCourse('${course.id}', '${standardId}')">Remove course</button>
-      `;
-      container.appendChild(sub);
-    }
-
-    function addCourse(standardId) {
-      const standard = standards.find(s => s.id === standardId);
-      if (!standard) return;
-      const course = { id: uid('course'), name: '', courseCode: '' };
-      standard.courses.push(course);
-      renderCourseCard(standardId, course);
-      renderAssignmentMatrix();
-      markDirty();
-    }
-
-    function updateCourseName(standardId, courseId, field, value) {
-      const standard = standards.find(s => s.id === standardId);
-      const course   = standard && standard.courses.find(c => c.id === courseId);
-      if (!course) return;
-      course[field] = value;
-      renderAssignmentMatrix();
-      refreshConstraintDropdowns();
-      markDirty();
-    }
-
-    function removeCourse(courseId, standardId) {
-      const standard = standards.find(s => s.id === standardId);
-      if (!standard) return;
-      const courseIndex = standard.courses.findIndex(c => c.id === courseId);
-      if (courseIndex === -1) return;
-
-      document.getElementById(courseId)?.remove();
-      standard.courses.splice(courseIndex, 1);
-
-      // Drop every division's assignment for this course
-      for (let i = assignments.length - 1; i >= 0; i--) {
-        if (assignments[i].courseId === courseId) assignments.splice(i, 1);
-      }
-
-      renderAssignmentMatrix();
-      refreshConstraintDropdowns();
-      markDirty();
-    }
-
-    function removeStandard(standardId) {
-      const standardIndex = standards.findIndex(s => s.id === standardId);
-      if (standardIndex === -1) return;
-      if (!confirm('Remove this standard, its divisions and all its courses?')) return;
-
-      const removed = standards[standardIndex];
-      const divisionIds = new Set((removed.divisions || []).map(d => d.id));
-      for (let i = assignments.length - 1; i >= 0; i--) {
-        if (divisionIds.has(assignments[i].divisionId)) assignments.splice(i, 1);
-      }
-
-      document.getElementById(standardId)?.remove();
-      standards.splice(standardIndex, 1);
-      renderAssignmentMatrix();
-      refreshConstraintDropdowns();
-      markDirty();
-    }
-
-    // Faculty Management
-    // Single renderer used by the add button, project load and demo data alike
-    function renderFacultyCard(fac) {
-      const container = document.getElementById('facultyContainer');
-      document.getElementById(fac.id)?.remove();
-
-      const cardDiv = document.createElement('div');
-      cardDiv.className = 'card';
-      cardDiv.id = fac.id;
-      cardDiv.innerHTML = `
-        <div class="grid">
-          <div>
-            <label>Faculty name</label>
-            <input type="text" value="${esc(fac.name)}" placeholder="Full name"
-              onchange="updateFaculty('${fac.id}', 'name', this.value)">
-          </div>
-          <div>
-            <label>Faculty code</label>
-            <input type="text" value="${esc(fac.facultyCode)}" placeholder="e.g. FAC01"
-              onchange="updateFaculty('${fac.id}', 'facultyCode', this.value)">
-          </div>
-        </div>
-        <button class="btn-remove" onclick="removeFaculty('${fac.id}')">Remove</button>
-      `;
-      container.appendChild(cardDiv);
-    }
-
-    function addFaculty() {
-      const facultyId = uid('faculty');
-      faculty.push({ id: facultyId, name: '', facultyCode: '' });
-      renderFacultyCard(faculty[faculty.length - 1]);
-
-      renderAssignmentMatrix();
-      markDirty();
-    }
-
-    function updateFaculty(facultyId, field, value) {
-      const fac = faculty.find(f => f.id === facultyId);
-      if (!fac) return;
-      fac[field] = value;
-      renderAssignmentMatrix();
-      refreshConstraintDropdowns();
-      markDirty();
-    }
-
-    function removeFaculty(facultyId) {
-      const facultyIndex = faculty.findIndex(f => f.id === facultyId);
-      if (facultyIndex === -1) return;
-
-      document.getElementById(facultyId)?.remove();
-      faculty.splice(facultyIndex, 1);
-
-      // Their assignments can't stand without a teacher — drop them outright
-      // (an assignment with no faculty is rejected by validation anyway).
-      for (let i = assignments.length - 1; i >= 0; i--) {
-        if (assignments[i].facultyId === facultyId) assignments.splice(i, 1);
-      }
-
-      renderAssignmentMatrix();
-      refreshConstraintDropdowns();
-      markDirty();
-    }
-
-    // ── Assignments: one grid per standard ──────────────────────────────
-    // Rows are courses, columns are divisions, each cell picks the teacher.
-    // A flat list would be unusable: 8 standards x 3 divisions x 8 courses is
-    // ~190 rows, whereas this is 8 compact tables.
-
-    /** The standard that owns a course, or null. */
-    function standardForCourse(courseId) {
-      return standards.find(s => (s.courses || []).some(c => c.id === courseId)) || null;
-    }
-
-    function findAssignment(divisionId, courseId) {
-      return assignments.find(a => a.divisionId === divisionId && a.courseId === courseId) || null;
-    }
-
-    /** Times per week is set per course and shared by all its divisions. */
-    function courseTimesPerWeek(courseId) {
-      const existing = assignments.find(a => a.courseId === courseId);
-      return existing ? (existing.timesPerWeek || 1) : 1;
-    }
-
-    function setCourseFaculty(divisionId, courseId, facultyId) {
-      const existing = findAssignment(divisionId, courseId);
-
-      if (!facultyId) {                       // "Not taught" — drop the assignment
-        if (existing) assignments.splice(assignments.indexOf(existing), 1);
-      } else if (existing) {
-        existing.facultyId = facultyId;
-      } else {
-        assignments.push({
-          id: uid('assignment'),
-          divisionId, courseId, facultyId,
-          timesPerWeek: courseTimesPerWeek(courseId)
-        });
-      }
-      renderAssignmentMatrix();
-      markDirty();
-    }
-
-    function setCourseTimesPerWeek(courseId, value) {
-      let tpw = parseInt(value);
-      if (isNaN(tpw) || tpw < 1) tpw = 1;
-      assignments.forEach(a => { if (a.courseId === courseId) a.timesPerWeek = tpw; });
-      renderAssignmentMatrix();
-      markDirty();
-    }
-
-    function renderAssignmentMatrix() {
-      const host = document.getElementById('assignmentMatrix');
-      if (!host) return;
-
-      const usable = standards.filter(s => (s.courses || []).length && (s.divisions || []).length);
-      if (usable.length === 0) {
-        host.innerHTML = `<p style="color:var(--muted);font-size:13px;margin:0;">Add a standard with at least one course and division first.</p>`;
-        return;
-      }
-      if (faculty.length === 0) {
-        host.innerHTML = `<p style="color:var(--muted);font-size:13px;margin:0;">Add faculty members first, then assign them to courses here.</p>`;
-        return;
-      }
-
-      host.innerHTML = usable.map(std => {
-        const divisions = std.divisions || [];
-
-        const head = divisions.map(d =>
-          `<th style="min-width:150px;">${esc(std.name)}-${esc(d.label)}</th>`).join('');
-
-        const rows = (std.courses || []).map(course => {
-          const cells = divisions.map(d => {
-            const current = findAssignment(d.id, course.id);
-            const options = ['<option value="">Not taught</option>'].concat(
-              faculty.map(f => {
-                const label = f.facultyCode ? `${f.name} (${f.facultyCode})` : f.name;
-                return `<option value="${f.id}" ${current && current.facultyId === f.id ? 'selected' : ''}>${esc(label || '(unnamed)')}</option>`;
-              })
-            ).join('');
-            return `<td><select onchange="setCourseFaculty('${d.id}','${course.id}',this.value)">${options}</select></td>`;
-          }).join('');
-
-          return `
-            <tr>
-              <td style="text-align:left;font-weight:600;">${esc(course.name || '(unnamed course)')}
-                ${course.courseCode ? `<span style="font-weight:400;color:var(--muted);"> · ${esc(course.courseCode)}</span>` : ''}
-              </td>
-              <td style="width:110px;">
-                <input type="number" min="1" value="${courseTimesPerWeek(course.id)}"
-                  onchange="setCourseTimesPerWeek('${course.id}', this.value)">
-              </td>
-              ${cells}
-            </tr>`;
-        }).join('');
-
-        return `
-          <div class="result-card">
-            <h4>${esc(std.name || '(unnamed standard)')}</h4>
-            <div class="table-wrapper">
-              <table>
-                <thead><tr><th style="text-align:left;">Course</th><th>Per week</th>${head}</tr></thead>
-                <tbody>${rows}</tbody>
-              </table>
-            </div>
-          </div>`;
-      }).join('');
-    }
-
-    // Classroom Management
-    /** Re-render every standard's division rows (their room dropdowns list rooms). */
-    function refreshDivisionRoomPickers() {
-      standards.forEach(s => renderStandardDivisions(s.id));
-    }
-
-    function addRoom(name = '') {
-      const roomId = uid('room');
-      classrooms.push({ id: roomId, name });
-      renderRoomCard({ id: roomId, name });
-      refreshDivisionRoomPickers();
-      markDirty();
-      return roomId;
-    }
-
-    function renderRoomCard(room) {
-      const container = document.getElementById('roomContainer');
-      const cardDiv = document.createElement('div');
-      cardDiv.className = 'card';
-      cardDiv.id = room.id;
-      cardDiv.innerHTML = `
-        <div class="grid">
-          <div><label>Classroom name</label>
-            <input type="text" placeholder="e.g. Room 1" value="${esc(room.name)}"
-              onchange="updateRoom('${room.id}', this.value)"></div>
-        </div>
-        <button class="btn-remove" onclick="removeRoom('${room.id}')">Remove</button>
-      `;
-      container.appendChild(cardDiv);
-    }
-
-    function updateRoom(roomId, name) {
-      const room = classrooms.find(r => r.id === roomId);
-      if (!room) return;
-      room.name = name;
-      refreshDivisionRoomPickers();
-      if (typeof refreshConstraintDropdowns === 'function') refreshConstraintDropdowns();
-      markDirty();
-    }
-
-    function removeRoom(roomId) {
-      const idx = classrooms.findIndex(r => r.id === roomId);
-      if (idx === -1) return;
-      document.getElementById(roomId)?.remove();
-      classrooms.splice(idx, 1);
-
-      // A division must never point at a room that no longer exists
-      standards.forEach(std => {
-        (std.divisions || []).forEach(d => {
-          if (d.roomId === roomId) d.roomId = null;
-        });
-      });
-
-      refreshDivisionRoomPickers();
-      if (typeof refreshConstraintDropdowns === 'function') refreshConstraintDropdowns();
-      markDirty();
-    }
-
-    // Time Slot Management - FIXED
-    function addTimeSlot() {
-      timeSlotValues.push({ startTime: '', endTime: '' });
-      renderTimeSlots();
-    }
-
-    function removeTimeSlot(index) {
-      if (timeSlotValues.length > 1) {
-        timeSlotValues.splice(index, 1);
-        renderTimeSlots();
-      }
-    }
-
-    function renderTimeSlots() {
-      const container = document.getElementById("timeSlots");
-      let html = '';
-      for (let i = 0; i < timeSlotValues.length; i++) {
-        html += `
-          <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; margin-bottom: 12px; align-items: flex-end;">
-            <div>
-              <label>Slot ${i + 1} Start Time</label>
-              <input type="time" value="${timeSlotValues[i].startTime}" onchange="timeSlotValues[${i}].startTime = this.value">
-            </div>
-            <div>
-              <label>Slot ${i + 1} End Time</label>
-              <input type="time" value="${timeSlotValues[i].endTime}" onchange="timeSlotValues[${i}].endTime = this.value">
-            </div>
-            ${timeSlotValues.length > 1 ? `<button class="btn-remove" style="height: 38px;" onclick="removeTimeSlot(${i})">−</button>` : ''}
-          </div>
-        `;
-      }
-      container.innerHTML = html;
-    }
-
-    // Collect time slots from data array
-    function collectTimeSlots() {
-      return timeSlotValues.filter(slot => slot.startTime && slot.endTime);
-    }
-
-    // ── Break Time ──────────────────────────────────────────────────────
-    function updateBreakTime() {
-      breakTime = {
-        start: document.getElementById('breakStartInput').value,
-        end:   document.getElementById('breakEndInput').value
-      };
-      markDirty();
-    }
-
-    // ── Helper: build faculty options HTML ──────────────────────────────
-    function facultyOptionsHtml(selectedId) {
-      return faculty.map(f =>
-        `<option value="${f.id}" ${f.id === selectedId ? 'selected' : ''}>${esc(f.name)} (${esc(f.facultyCode)})</option>`
-      ).join('');
-    }
-
-    // ── Helper: build course options HTML (shows courseName, standardName, courseCode) ──
-    function courseOptionsHtml(selectedId) {
-      let opts = '';
-      standards.forEach(std => {
-        (std.courses || []).forEach(c => {
-          opts += `<option value="${c.id}" ${c.id === selectedId ? 'selected' : ''}>${esc(c.name)} — ${esc(std.name)} (${esc(c.courseCode)})</option>`;
-        });
-      });
-      return opts;
-    }
-
-    // ── Helper: build day options HTML ──────────────────────────────────
-    function dayOptionsHtml(selectedDay) {
-      const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-      return days.map(d => `<option value="${d}" ${d === selectedDay ? 'selected' : ''}>${d}</option>`).join('');
-    }
-
-    // ── Helper: build timeslot options HTML ─────────────────────────────
-    function slotOptionsHtml(selectedStart) {
-      const allSlot = `<option value="" ${!selectedStart ? 'selected' : ''}>All day</option>`;
-      const slotOpts = timeSlotValues.filter(s => s.startTime && s.endTime).map(s =>
-        `<option value="${s.startTime}" ${s.startTime === selectedStart ? 'selected' : ''}>${s.startTime} – ${s.endTime}</option>`
-      ).join('');
-      return allSlot + slotOpts;
-    }
-
-    // ── Hard Constraints ────────────────────────────────────────────────
-    // NOTE: cards are looked up/updated by their stable `id`, never by array
-    // index (see the Standards/Faculty/Assignment fix above for why).
-    function addHardConstraint() {
-      const container = document.getElementById('hardConstraintsContainer');
-      const cid = uid('hard');
-      hardConstraints.push({ id: cid, type: 'faculty_unavailability', facultyId: '', day: '', timeslot: '', courseId: '', classroom: '' });
-      renderHardConstraintCard(cid, container);
-      markDirty();
-    }
-
-    function renderHardConstraintCard(cid, container) {
-      const c = hardConstraints.find(x => x.id === cid);
-      if (!c) return;
-      const existing = document.getElementById(c.id);
-      if (existing) existing.remove();
-
-      const card = document.createElement('div');
-      card.className = 'card'; card.id = c.id;
-
-      let fieldsHtml = '';
-      if (c.type === 'faculty_unavailability') {
-        fieldsHtml = `
-          <div><label>Faculty</label>
-            <select onchange="updateHC('${cid}','facultyId',this.value)">
-              <option value="">Select a faculty member</option>${facultyOptionsHtml(c.facultyId)}
-            </select></div>
-          <div><label>Unavailable Day</label>
-            <select onchange="updateHC('${cid}','day',this.value)">
-              <option value="">Select a day</option>${dayOptionsHtml(c.day)}
-            </select></div>
-          <div><label>Timeslot (optional)</label>
-            <select onchange="updateHC('${cid}','timeslot',this.value)">
-              ${slotOptionsHtml(c.timeslot)}
-            </select></div>`;
-      } else if (c.type === 'faculty_first_half_only') {
-        fieldsHtml = `
-          <div><label>Faculty (only available before break)</label>
-            <select onchange="updateHC('${cid}','facultyId',this.value)">
-              <option value="">Select a faculty member</option>${facultyOptionsHtml(c.facultyId)}
-            </select></div>
-          <div style="font-size:12px;color:var(--muted);padding-top:20px;">Uses the break time set above to determine first half.</div>`;
-      } else if (c.type === 'faculty_second_half_only') {
-        fieldsHtml = `
-          <div><label>Faculty (only available after break)</label>
-            <select onchange="updateHC('${cid}','facultyId',this.value)">
-              <option value="">Select a faculty member</option>${facultyOptionsHtml(c.facultyId)}
-            </select></div>
-          <div style="font-size:12px;color:var(--muted);padding-top:20px;">Uses the break time set above to determine second half.</div>`;
-      }
-
-      card.innerHTML = `
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
-          <label style="margin:0;white-space:nowrap;">Constraint Type</label>
-          <select style="flex:1;min-width:220px;" onchange="updateHCType('${cid}',this.value)">
-            <option value="faculty_unavailability"   ${c.type==='faculty_unavailability'?'selected':''}>Faculty Unavailability</option>
-            <option value="faculty_first_half_only"  ${c.type==='faculty_first_half_only'?'selected':''}>Faculty Available First Half Only</option>
-            <option value="faculty_second_half_only" ${c.type==='faculty_second_half_only'?'selected':''}>Faculty Available Second Half Only</option>
-          </select>
-        </div>
-        <div class="grid">${fieldsHtml}</div>
-        <button class="btn-remove" onclick="removeHardConstraint('${c.id}')">Remove</button>`;
-      container.appendChild(card);
-    }
-
-    function updateHCType(cid, newType) {
-      const c = hardConstraints.find(x => x.id === cid);
-      if (!c) return;
-      c.type = newType;
-      c.facultyId = '';
-      c.day       = '';
-      c.timeslot  = '';
-      c.courseId  = '';
-      c.classroom = '';
-      const container = document.getElementById('hardConstraintsContainer');
-      renderHardConstraintCard(cid, container);
-      markDirty();
-    }
-
-    function updateHC(cid, field, value) {
-      const c = hardConstraints.find(x => x.id === cid);
-      if (c) { c[field] = value; markDirty(); }
-    }
-
-    function removeHardConstraint(cid) {
-      document.getElementById(cid)?.remove();
-      const idx = hardConstraints.findIndex(x => x.id === cid);
-      if (idx !== -1) hardConstraints.splice(idx, 1);
-      markDirty();
-    }
-
-    // ── Soft Constraints ────────────────────────────────────────────────
-    function addSoftConstraint() {
-      const container = document.getElementById('softConstraintsContainer');
-      const cid = uid('soft');
-      softConstraints.push({ id: cid, type: 'faculty_prefers_first_half', facultyId: '', courseId: '', preference: 'morning', weight: 50, label: '' });
-      renderSoftConstraintCard(cid, container);
-      markDirty();
-    }
-
-    function renderSoftConstraintCard(cid, container) {
-      const c = softConstraints.find(x => x.id === cid);
-      if (!c) return;
-      const existing = document.getElementById(c.id);
-      if (existing) existing.remove();
-
-      const card = document.createElement('div');
-      card.className = 'card'; card.id = c.id;
-
-      let fieldsHtml = '';
-      if (c.type === 'faculty_prefers_first_half') {
-        fieldsHtml = `
-          <div><label>Faculty</label>
-            <select onchange="updateSC('${cid}','facultyId',this.value)">
-              <option value="">Select a faculty member</option>${facultyOptionsHtml(c.facultyId)}
-            </select></div>`;
-      } else if (c.type === 'faculty_prefers_second_half') {
-        fieldsHtml = `
-          <div><label>Faculty</label>
-            <select onchange="updateSC('${cid}','facultyId',this.value)">
-              <option value="">Select a faculty member</option>${facultyOptionsHtml(c.facultyId)}
-            </select></div>`;
-      } else if (c.type === 'no_back_to_back_course') {
-        fieldsHtml = `<div style="font-size:12px;color:var(--muted);padding-top:20px;">Applies to all courses and standards — penalises any course taught to the same standard in consecutive time slots on the same day.</div>`;
-      } else if (c.type === 'balanced_daily_load') {
-        fieldsHtml = `<div style="font-size:12px;color:var(--muted);padding-top:20px;">Applies to all faculty — penalises uneven load distribution across the week.</div>`;
-      } else if (c.type === 'course_preferred_slot') {
-        fieldsHtml = `
-          <div><label>Course</label>
-            <select onchange="updateSC('${cid}','courseId',this.value)">
-              <option value="">Select a course</option>${courseOptionsHtml(c.courseId)}
-            </select></div>
-          <div><label>Preferred Time</label>
-            <select onchange="updateSC('${cid}','preference',this.value)">
-              <option value="morning"   ${c.preference==='morning'?'selected':''}>Morning (first half)</option>
-              <option value="afternoon" ${c.preference==='afternoon'?'selected':''}>Afternoon (second half)</option>
-              <option value="last"      ${c.preference==='last'?'selected':''}>Last slot of day</option>
-            </select></div>`;
-      }
-
-      card.innerHTML = `
-        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;flex-wrap:wrap;">
-          <label style="margin:0;white-space:nowrap;">Constraint Type</label>
-          <select style="flex:1;min-width:220px;" onchange="updateSCType('${cid}',this.value)">
-            <option value="faculty_prefers_first_half"  ${c.type==='faculty_prefers_first_half'?'selected':''}>Faculty Prefers First Half</option>
-            <option value="faculty_prefers_second_half" ${c.type==='faculty_prefers_second_half'?'selected':''}>Faculty Prefers Second Half</option>
-            <option value="no_back_to_back_course"      ${c.type==='no_back_to_back_course'?'selected':''}>No back-to-back same course (same standard)</option>
-            <option value="balanced_daily_load"         ${c.type==='balanced_daily_load'?'selected':''}>Balanced Daily Load for Faculty</option>
-            <option value="course_preferred_slot"       ${c.type==='course_preferred_slot'?'selected':''}>Course Preferred Timeslot</option>
-          </select>
-          <div style="display:flex;align-items:center;gap:6px;">
-            <label style="margin:0;white-space:nowrap;font-size:12px;">Weight</label>
-            <input type="number" value="${c.weight}" min="1" max="200" style="width:70px;"
-              onchange="updateSC('${cid}','weight',parseInt(this.value))">
-          </div>
-        </div>
-        <div class="grid">${fieldsHtml}</div>
-        <button class="btn-remove" onclick="removeSoftConstraint('${c.id}')">Remove</button>`;
-      container.appendChild(card);
-    }
-
-    function updateSCType(cid, newType) {
-      const c = softConstraints.find(x => x.id === cid);
-      if (!c) return;
-      c.type       = newType;
-      c.facultyId  = '';
-      c.courseId   = '';
-      c.preference = 'morning';
-      const container = document.getElementById('softConstraintsContainer');
-      renderSoftConstraintCard(cid, container);
-      markDirty();
-    }
-
-    function updateSC(cid, field, value) {
-      const c = softConstraints.find(x => x.id === cid);
-      if (c) { c[field] = value; markDirty(); }
-    }
-
-    function removeSoftConstraint(cid) {
-      document.getElementById(cid)?.remove();
-      const idx = softConstraints.findIndex(x => x.id === cid);
-      if (idx !== -1) softConstraints.splice(idx, 1);
-      markDirty();
-    }
-
-    // ── Refresh constraint dropdowns when faculty/courses/rooms change ──
-    function refreshConstraintDropdowns() {
-      const hardContainer = document.getElementById('hardConstraintsContainer');
-      hardConstraints.forEach(c => {
-        if (document.getElementById(c.id)) renderHardConstraintCard(c.id, hardContainer);
-      });
-      const softContainer = document.getElementById('softConstraintsContainer');
-      softConstraints.forEach(c => {
-        if (document.getElementById(c.id)) renderSoftConstraintCard(c.id, softContainer);
-      });
-    }
-
-    // Timetable functions
-    // esc() (defined below) HTML-escapes text content. escAttr() safely embeds a
-    // JS value as a quoted string literal inside an inline onclick/onchange attribute.
-    function escAttr(value) {
-      return esc(JSON.stringify(String(value)));
-    }
-
-    function createPreviewTable(schedule) {
-      const container = document.getElementById('previewContainer');
-      let html = '<div class="table-wrapper"><table><thead><tr><th>Day</th><th>Standard</th><th>Course</th><th>Faculty</th><th>Classroom</th><th>Time</th></tr></thead><tbody>';
-
-      Object.entries(schedule).forEach(([day, classes]) => {
-        classes.forEach((cls, idx) => {
-          html += `<tr>
-            ${idx === 0 ? `<td rowspan="${classes.length}"><strong>${esc(day)}</strong></td>` : ''}
-            <td>${esc(cls.standard)}</td>
-            <td>${esc(cls.course)}</td>
-            <td>${esc(cls.faculty)}</td>
-            <td>${esc(cls.classroom)}</td>
-            <td>${esc(cls.startTime)} - ${esc(cls.endTime)}</td>
-          </tr>`;
-        });
-      });
-
-      html += '</tbody></table></div>';
-      container.innerHTML = html;
-    }
-
-    function toggleMoreDetails() {
-      const section = document.getElementById('moreDetailsSection');
-      section.style.display = section.style.display === 'none' ? 'block' : 'none';
-    }
-
-    function createStandardTimetables(schedule) {
-      const container = document.getElementById('standardTimetablesContainer');
-      let html = '';
-
-      const allStandards = new Set();
-      Object.values(schedule).forEach(dayClasses => {
-        dayClasses.forEach(cls => allStandards.add(cls.standard));
-      });
-
-      Array.from(allStandards).forEach(standard => {
-        const safeId = standard.replace(/[^a-zA-Z0-9_-]/g, '_');
-        html += `<div class="result-card">
-          <h4>${esc(standard)}</h4>
-          <div class="export-btn-row" style="margin-bottom: 10px;">
-            <button class="btn-secondary" onclick="createStandardTable(${escAttr(standard)}, ${escAttr(standard)})" style="width: auto;">Generate</button>
-            <button class="btn-secondary" onclick="downloadStandardAsExcel(${escAttr(standard)})" style="width: auto;">Excel</button>
-            <button class="btn-secondary" onclick="downloadStandardAsPdf(${escAttr(safeId)}, ${escAttr(standard)})" style="width: auto;">PDF</button>
-            <button class="btn-secondary" onclick="downloadStandardAsImage(${escAttr(safeId)})" style="width: auto;">Image</button>
-          </div>
-          <div id="table-${safeId}"></div>
-        </div>`;
-      });
-
-      container.innerHTML = html || '<p style="color:var(--muted);font-size:13px;">No standards found.</p>';
-    }
-
-    function createStandardTable(standard, standardLabel) {
-      const containerId = `table-${standard.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
-      const container = document.getElementById(containerId);
-
-      if (!container) return;
-
-      const allDays = Object.keys(currentScheduleData).sort((a, b) => {
-        const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-        return dayOrder.indexOf(a) - dayOrder.indexOf(b);
-      });
-
-      const allTimes = new Set();
-      Object.values(currentScheduleData).forEach(dayClasses => {
-        dayClasses.forEach(cls => {
-          if (cls.standard === standard) {
-            allTimes.add(cls.startTime);
-          }
-        });
-      });
-
-      const times = Array.from(allTimes).sort();
-
-      let html = '<div class="table-wrapper"><table style="width: 100%; border-collapse: collapse; margin-top: 10px;"><thead><tr><th style="border: 1px solid var(--border); padding: 8px; background: var(--surface-sunken); color: var(--text-secondary);">Time</th>';
-
-      allDays.forEach(day => {
-        html += `<th style="border: 1px solid var(--border); padding: 8px; background: var(--surface-sunken); color: var(--text-secondary);">${esc(day)}</th>`;
-      });
-
-      html += '</tr></thead><tbody>';
-
-      times.forEach(time => {
-        html += `<tr><td style="border: 1px solid var(--border); padding: 8px; font-weight: 600; background: var(--surface-sunken); color: var(--text);">${esc(time)}</td>`;
-
-        allDays.forEach(day => {
-          const classAtTime = currentScheduleData[day]?.find(c =>
-            c.standard === standard && c.startTime === time
-          );
-
-          const cellContent = classAtTime
-            ? `<strong style="color:var(--accent);">${esc(classAtTime.course)}</strong><br><span style="color:var(--text-secondary);">${esc(classAtTime.faculty)}</span><br><span style="color:var(--muted);">${esc(classAtTime.classroom)}</span>`
-            : '<span style="color:var(--faint);">—</span>';
-
-          html += `<td style="border: 1px solid var(--border); padding: 8px; background: ${classAtTime ? 'var(--accent-soft)' : 'var(--surface)'}; text-align:center;">${cellContent}</td>`;
-        });
-
-        html += '</tr>';
-      });
-
-      html += '</tbody></table></div>';
-      container.innerHTML = html;
-    }
-
-    // CSV-safe cell: doubles embedded quotes, and neutralizes leading =/+/-/@
-    // so a name like "=HYPERLINK(...)" can't execute as a formula on open.
-    function csvCell(value) {
-      let s = String(value == null ? '' : value);
-      if (/^[=+\-@]/.test(s)) s = "'" + s;
-      return '"' + s.replace(/"/g, '""') + '"';
-    }
-
-    function downloadStandardAsExcel(standard) {
-      if (!currentScheduleData) {
-        showAlert('No schedule generated yet', 'error');
-        return;
-      }
-
-      let csv = 'Time,';
-      const allDays = Object.keys(currentScheduleData).sort((a, b) => {
-        const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-        return dayOrder.indexOf(a) - dayOrder.indexOf(b);
-      });
-      allDays.forEach(day => csv += `${csvCell(day)},`);
-      csv += '\n';
-
-      const allTimes = new Set();
-      Object.values(currentScheduleData).forEach(dayClasses => {
-        dayClasses.forEach(cls => {
-          if (cls.standard === standard) {
-            allTimes.add(cls.startTime);
-          }
-        });
-      });
-
-      const times = Array.from(allTimes).sort();
-      times.forEach(time => {
-        csv += `${csvCell(time)},`;
-        allDays.forEach(day => {
-          const classAtTime = currentScheduleData[day]?.find(c =>
-            c.standard === standard && c.startTime === time
-          );
-          csv += `${csvCell(classAtTime ? `${classAtTime.course} - ${classAtTime.faculty}` : '—')},`;
-        });
-        csv += '\n';
-      });
-
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${standard.replace(/\s+/g, '_')}_timetable.csv`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      showAlert(`Timetable for ${standard} downloaded`, 'success');
-    }
-
-    function downloadStandardAsImage(standardId) {
-      const element = document.getElementById(`table-${standardId}`);
-      if (!element || element.innerHTML.trim() === '') {
-        showAlert('Generate the table first', 'error');
-        return;
-      }
-
-      const script = document.createElement('script');
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-      document.head.appendChild(script);
-
-      script.onload = function () {
-        html2canvas(element, { backgroundColor: '#ffffff' }).then(canvas => {
-          const link = document.createElement('a');
-          link.href = canvas.toDataURL('image/png');
-          link.download = `${standardId}_timetable.png`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          showAlert('Image downloaded', 'success');
-        });
-      };
-    }
-
-    // ── Faculty-wise Timetable Functions ─────────────────────────────
-    function populateFacultyTimetableDropdown() {
-      const select = document.getElementById('facultyTimetableSelect');
-      if (!select) return;
-      select.innerHTML = '<option value="">Choose a faculty member</option>';
-      // Clear any previously shown timetables
-      document.getElementById('facultyTimetablesContainer').innerHTML = '';
-
-      // Gather unique faculty from the generated schedule
-      if (!currentScheduleData) return;
-      const facSet = new Map(); // facultyName → facultyCode
-      Object.values(currentScheduleData).forEach(dayClasses => {
-        dayClasses.forEach(cls => {
-          if (cls.faculty && !facSet.has(cls.faculty)) {
-            facSet.set(cls.faculty, cls.facultyCode || '');
-          }
-        });
-      });
-
-      facSet.forEach((code, name) => {
-        const opt = document.createElement('option');
-        opt.value = name;
-        opt.textContent = code ? `${name} (${code})` : name;
-        select.appendChild(opt);
-      });
-    }
-
-    function showFacultyTimetable() {
-      const select = document.getElementById('facultyTimetableSelect');
-      const facultyName = select.value;
-      if (!facultyName) {
-        showAlert('Please select a faculty member', 'error');
-        return;
-      }
-      if (!currentScheduleData) {
-        showAlert('No schedule generated yet', 'error');
-        return;
-      }
-
-      const container = document.getElementById('facultyTimetablesContainer');
-      const safeId = 'fac-' + facultyName.replace(/[^a-zA-Z0-9]/g, '_');
-
-      // Don't duplicate — if already shown, just scroll to it
-      if (document.getElementById(safeId)) {
-        document.getElementById(safeId).scrollIntoView({ behavior: 'smooth', block: 'center' });
-        return;
-      }
-
-      // Build the card
-      const card = document.createElement('div');
-      card.id = safeId;
-      card.className = 'result-card';
-      card.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
-          <h4 style="margin:0;">${esc(facultyName)}</h4>
-          <div class="export-btn-row">
-            <button class="btn-secondary" onclick="downloadFacultyAsExcel(${escAttr(facultyName)})" style="width:auto;">CSV</button>
-            <button class="btn-secondary" onclick="downloadFacultyAsPdf(${escAttr(safeId)}, ${escAttr(facultyName)})" style="width:auto;">PDF</button>
-            <button class="btn-secondary" onclick="downloadFacultyAsImage(${escAttr(safeId)})" style="width:auto;">Image</button>
-            <button class="btn-remove" onclick="document.getElementById(${escAttr(safeId)}).remove()" style="margin:0;">Close</button>
-          </div>
-        </div>
-        <div id="${safeId}-table"></div>`;
-      container.prepend(card);
-
-      // Build the table
-      createFacultyTable(facultyName, `${safeId}-table`);
-      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-
-    function createFacultyTable(facultyName, containerId) {
-      const container = document.getElementById(containerId);
-      if (!container || !currentScheduleData) return;
-
-      const allDays = Object.keys(currentScheduleData).sort((a, b) => {
-        const dayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-        return dayOrder.indexOf(a) - dayOrder.indexOf(b);
-      });
-
-      // Collect time slots where this faculty has any class
-      const allTimes = new Set();
-      Object.values(currentScheduleData).forEach(dayClasses => {
-        dayClasses.forEach(cls => {
-          if (cls.faculty === facultyName) allTimes.add(cls.startTime);
-        });
-      });
-      const times = Array.from(allTimes).sort();
-
-      if (times.length === 0) {
-        container.innerHTML = '<p style="color:var(--muted); font-size:13px;">No classes found for this faculty.</p>';
-        return;
-      }
-
-      let html = '<div class="table-wrapper"><table style="width:100%; border-collapse:collapse; margin-top:10px;"><thead><tr>';
-      html += '<th style="border:1px solid var(--border); padding:8px; background:var(--surface-sunken); color:var(--text-secondary);">Time</th>';
-      allDays.forEach(day => {
-        html += `<th style="border:1px solid var(--border); padding:8px; background:var(--surface-sunken); color:var(--text-secondary);">${esc(day)}</th>`;
-      });
-      html += '</tr></thead><tbody>';
-
-      times.forEach(time => {
-        html += `<tr><td style="border:1px solid var(--border); padding:8px; font-weight:600; background:var(--surface-sunken); color:var(--text);">${esc(time)}</td>`;
-        allDays.forEach(day => {
-          const cls = (currentScheduleData[day] || []).find(c =>
-            c.faculty === facultyName && c.startTime === time
-          );
-          const cellContent = cls
-            ? `<strong style="color:var(--accent);">${esc(cls.course)}</strong><br><span style="color:var(--text-secondary);">${esc(cls.standard)}</span><br><span style="color:var(--muted);">${esc(cls.classroom)}</span>`
-            : '<span style="color:var(--faint);">—</span>';
-          html += `<td style="border:1px solid var(--border); padding:8px; background:${cls ? 'var(--accent-soft)' : 'var(--surface)'}; text-align:center;">${cellContent}</td>`;
-        });
-        html += '</tr>';
-      });
-
-      html += '</tbody></table></div>';
-      container.innerHTML = html;
-    }
-
-    function downloadFacultyAsExcel(facultyName) {
-      if (!currentScheduleData) {
-        showAlert('No schedule generated yet', 'error');
-        return;
-      }
-
-      const allDays = Object.keys(currentScheduleData).sort((a, b) => {
-        const dayOrder = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-        return dayOrder.indexOf(a) - dayOrder.indexOf(b);
-      });
-
-      let csv = 'Time,';
-      allDays.forEach(day => csv += `${csvCell(day)},`);
-      csv += '\n';
-
-      const allTimes = new Set();
-      Object.values(currentScheduleData).forEach(dayClasses => {
-        dayClasses.forEach(cls => {
-          if (cls.faculty === facultyName) allTimes.add(cls.startTime);
-        });
-      });
-
-      const times = Array.from(allTimes).sort();
-      times.forEach(time => {
-        csv += `${csvCell(time)},`;
-        allDays.forEach(day => {
-          const cls = (currentScheduleData[day] || []).find(c =>
-            c.faculty === facultyName && c.startTime === time
-          );
-          csv += `${csvCell(cls ? `${cls.course} - ${cls.standard} (${cls.classroom})` : '—')},`;
-        });
-        csv += '\n';
-      });
-
-      const blob = new Blob([csv], { type: 'text/csv' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${facultyName.replace(/\s+/g, '_')}_timetable.csv`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      showAlert(`Timetable for ${facultyName} downloaded`, 'success');
-    }
-
-    function downloadFacultyAsImage(safeId) {
-      const element = document.getElementById(`${safeId}-table`);
-      if (!element || element.innerHTML.trim() === '') {
-        showAlert('Open the timetable first', 'error');
-        return;
-      }
-
-      const script = document.createElement('script');
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-      document.head.appendChild(script);
-
-      script.onload = function () {
-        html2canvas(element, { backgroundColor: '#FFFFFF' }).then(canvas => {
-          const link = document.createElement('a');
-          link.href = canvas.toDataURL('image/png');
-          link.download = `${safeId}_timetable.png`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          showAlert('Image downloaded', 'success');
-        });
-      };
-    }
-
-    // Main timetable generation
-    async function generateTimetable() {
-      const genBtn = document.getElementById('generateBtn');
-      if (genBtn && genBtn.disabled) return; // already generating — ignore extra clicks
-
-      if (standards.length === 0 || standards.some(s => s.courses.length === 0)) {
-        showAlert('Please add at least one standard with courses', 'error'); return;
-      }
-      if (faculty.length === 0) { showAlert('Please add at least one faculty member', 'error'); return; }
-      if (assignments.length === 0) { showAlert('Please add at least one course assignment', 'error'); return; }
-      if (assignments.some(a => !a.courseId || !a.facultyId)) {
-        showAlert('Every assignment needs both a course and a faculty selected — remove or complete any incomplete assignments', 'error');
-        return;
-      }
-      const rooms = getClassrooms();
-      if (rooms.length === 0) { showAlert('Please add at least one classroom', 'error'); return; }
-      const roomNames = rooms.map(r => r.name.trim().toLowerCase());
-      const dupIdx = roomNames.findIndex((n, i) => roomNames.indexOf(n) !== i);
-      if (dupIdx !== -1) { showAlert(`Duplicate classroom "${rooms[dupIdx].name}" — classroom names must be unique`, 'error'); return; }
-      if (selectedDays.length === 0) { showAlert('Please select at least one day', 'error'); return; }
-      const slots = collectTimeSlots();
-      if (slots.length === 0) { showAlert('Please add at least one time slot', 'error'); return; }
-
-      setGeneratingUi(true);
-      document.getElementById('outputSection').style.display = 'none';
-      document.getElementById('slowPanel').style.display = 'none';
-
-      try {
-        const response = await authFetch(`${API_BASE_URL}/api/generate-timetable`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            projectId: PROJ_ID,
-            standards, faculty, assignments, classrooms: rooms,
-            daysOfWeek: selectedDays,
-            timeSlots: slots,
-            hardConstraints, softConstraints,
-            breakTime
-          })
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          // Provably impossible — never even starts the search
-          if (data.impossible && data.reasons && data.reasons.length) {
-            showImpossiblePanel(data.reasons);
-            return;
-          }
-          const msg = data.errors && data.errors.length
-            ? data.errors.map((e, i) => `${i+1}. ${e}`).join('\n')
-            : (data.error || 'Failed to generate timetable');
-          throw new Error(msg);
-        }
-
-        activeJobId = data.jobId;
-        await pollJob(data.jobId);
-
-      } catch (error) {
-        showAlert('Error: ' + error.message, 'error');
-        console.error(error);
-      } finally {
-        setGeneratingUi(false);
-      }
-    }
-
-    // ── Generation job: progress, escalation, cancellation ───────────────
-    let activeJobId = null;
-    let jobStartedAt = 0;
-
-    function setGeneratingUi(running) {
-      const genBtn = document.getElementById('generateBtn');
-      document.getElementById('loadingIndicator').classList.toggle('active', running);
-      if (genBtn) {
-        genBtn.disabled = running;
-        genBtn.style.opacity = running ? '0.6' : '';
-        genBtn.style.cursor  = running ? 'not-allowed' : '';
-      }
-      if (running) {
-        jobStartedAt = Date.now();
-        document.getElementById('loadingHeadline').textContent = 'Generating your schedule, please wait…';
-        document.getElementById('generationCount').textContent = '';
-      } else {
-        activeJobId = null;
-      }
-    }
-
-    const sleep = ms => new Promise(r => setTimeout(r, ms));
-
-    async function pollJob(jobId, { improve = false } = {}) {
-      while (true) {
-        await sleep(600);
-        if (activeJobId !== jobId) return;   // cancelled
-
-        const res  = await authFetch(`${API_BASE_URL}/api/jobs/${jobId}`);
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Lost track of the generation job.');
-
-        if (data.status === 'running') { updateRunProgress(data, improve); continue; }
-        if (data.status === 'cancelled') return;
-        if (data.status === 'error') throw new Error(data.error || 'Generation failed.');
-
-        if (data.status === 'done') {
-          document.getElementById('slowPanel').style.display = 'none';
-          if (improve) applyImprovedSchedule(data);
-          else         applyGeneratedSchedule(data);
-          return;
-        }
-      }
-    }
-
-    function updateRunProgress(data, improve = false) {
-      const secs = Math.floor(data.elapsedMs / 1000);
-      const p    = data.progress || {};
-      const bits = [];
-      if (p.totalGenerations) bits.push(`generation ${p.totalGenerations.toLocaleString()}`);
-      if (improve) {
-        // Hard constraints are already met here — the number that matters is the
-        // soft penalty coming down, not clashes.
-        if (p.softPenalty !== undefined && p.softPenalty !== null) bits.push(`preference score ${p.softPenalty}`);
-      } else if (p.conflicts !== null && p.conflicts !== undefined) {
-        bits.push(`${p.conflicts} clash${p.conflicts === 1 ? '' : 'es'} left`);
-      }
-      bits.push(`${secs}s`);
-      document.getElementById('generationCount').textContent = bits.join(' · ');
-
-      if (improve) return;   // an improve run is bounded; no stagnation advice needed
-
-      // Escalate: quiet for the first minute, advice after one, firmer after two.
-      const headline = document.getElementById('loadingHeadline');
-      if (secs >= 120) {
-        headline.textContent = 'This is taking much longer than expected.';
-        showSlowPanel(data.diagnostics, 'severe');
-      } else if (secs >= 60) {
-        headline.textContent = 'Taking longer than usual…';
-        showSlowPanel(data.diagnostics, 'warn');
-      }
-    }
-
-    /** Advice shown during a slow run — deliberately left on screen after Cancel. */
-    function showSlowPanel(diagnostics, level) {
-      const panel = document.getElementById('slowPanel');
-      if (!diagnostics) return;
-      if (panel.dataset.level === level) return;   // already rendered at this level
-      panel.dataset.level = level;
-
-      const severe = level === 'severe';
-      const tight = (diagnostics.tight || []).map(t =>
-        `<li style="margin-bottom:4px;"><strong>${esc(t.name)}</strong> — ${t.used} of ${t.capacity} periods used (${t.percent}%)</li>`).join('');
-
-      panel.style.cssText = `background:var(--${severe ? 'danger' : 'warning'}-soft);border:1px solid var(--${severe ? 'danger' : 'warning'}-border);border-radius:var(--radius);padding:18px;margin:18px 0;`;
-      panel.innerHTML = `
-        <h3 style="color:var(--${severe ? 'danger' : 'warning'});margin:0 0 8px 0;font-size:15px;">
-          ${severe ? 'Still searching — this schedule looks very tight' : 'This is taking longer than usual'}
-        </h3>
-        <p style="color:var(--text-secondary);font-size:13px;margin:0 0 12px 0;line-height:1.6;">
-          ${severe
-            ? 'The scheduler will keep trying for as long as you let it, but these inputs leave it very little room. Consider the changes below, then cancel and generate again.'
-            : 'The scheduler is still working. You can let it continue, or apply one of these changes and try again.'}
-        </p>
-        ${tight ? `<p style="font-size:12px;font-weight:600;color:var(--text);margin:0 0 6px 0;">Under most pressure</p>
-        <ul style="margin:0 0 12px 0;padding-left:20px;font-size:13px;color:var(--text-secondary);line-height:1.5;">${tight}</ul>` : ''}
-        <p style="font-size:12px;font-weight:600;color:var(--text);margin:0 0 6px 0;">Suggested changes</p>
-        <ul style="margin:0;padding-left:20px;font-size:13px;color:var(--text-secondary);line-height:1.6;">
-          ${(diagnostics.suggestions || []).map(s => `<li style="margin-bottom:5px;">${esc(s)}</li>`).join('')}
-        </ul>`;
-      panel.style.display = 'block';
-    }
-
-    async function cancelGeneration() {
-      if (!activeJobId) return;
-      const jobId = activeJobId;
-      activeJobId = null;                     // stops the poll loop
-      setGeneratingUi(false);
-      try { await authFetch(`${API_BASE_URL}/api/jobs/${jobId}`, { method: 'DELETE' }); } catch {}
-      // The advice panel deliberately stays up so it can be acted on.
-      showAlert('Generation cancelled.', 'info');
-    }
-
-    function applyGeneratedSchedule(data, { announce = true } = {}) {
-      generatedFilename    = data.filename;
-      currentScheduleData  = data.data;
-      currentSolutionGenes = data.genes || currentSolutionGenes;
-      currentStats         = data.stats;
-
-      document.getElementById('conflictCount').textContent = data.stats.conflicts;
-      document.getElementById('fitnessScore').textContent  = data.stats.fitness;
-      document.getElementById('classCount').textContent    = data.stats.classCount;
-
-      renderSoftReport(data.stats.softReport || [], data.stats.conflicts);
-      renderHardStatus(data.stats.conflicts);
-
-      createPreviewTable(data.data);
-      createStandardTimetables(data.data);
-      populateFacultyTimetableDropdown();
-      renderPreferenceSummary(data.stats);
-
-      document.getElementById('outputSection').style.display = 'block';
-      document.getElementById('impossiblePanel')?.remove();
-      if (announce) showAlert('Schedule generated successfully', 'success');
-    }
-
-    // ── Demo data ───────────────────────────────────────────────────────
-    function projectHasData() {
-      return standards.length > 0 || faculty.length > 0 || classrooms.length > 0 ||
-             assignments.length > 0 || hardConstraints.length > 0 || softConstraints.length > 0;
-    }
-
-    async function fillDemoData() {
-      if (projectHasData() &&
-          !confirm('This will replace everything currently in this project — standards, teachers, classrooms, assignments and constraints. Continue?')) {
-        return;
-      }
-
-      const btn = document.getElementById('demoBtn');
-      btn.disabled = true;
-      const originalLabel = btn.textContent;
-      btn.textContent = 'Loading sample school…';
-
-      try {
-        const res  = await authFetch(`${API_BASE_URL}/api/demo-data`);
-        const body = await res.json();
-        if (!res.ok || !body.success) throw new Error(body.error || 'Could not load the demo data.');
-        const d = body.data;
-
-        // Replace the in-memory model wholesale, then rebuild the UI from it
-        standards       = d.standards;
-        faculty         = d.faculty;
-        assignments     = d.assignments;
-        classrooms      = d.classrooms;
-        selectedDays    = d.selectedDays;
-        timeSlotValues  = d.timeSlotValues;
-        hardConstraints = d.hardConstraints;
-        softConstraints = d.softConstraints;
-        breakTime       = d.breakTime;
-
-        generatedFilename = null; currentScheduleData = null;
-        currentSolutionGenes = null; currentStats = null; previousResult = null;
-
-        document.getElementById('standardsContainer').innerHTML = '';
-        document.getElementById('facultyContainer').innerHTML   = '';
-        document.getElementById('roomContainer').innerHTML      = '';
-        document.getElementById('hardConstraintsContainer').innerHTML = '';
-        document.getElementById('softConstraintsContainer').innerHTML = '';
-        document.getElementById('outputSection').style.display = 'none';
-        document.getElementById('preferencesBlock').style.display = 'none';
-        document.getElementById('slowPanel').style.display = 'none';
-        document.getElementById('impossiblePanel')?.remove();
-
-        classrooms.forEach(renderRoomCard);
-        standards.forEach(renderStandardCard);
-        faculty.forEach(fac => renderFacultyCard(fac));
-        document.querySelectorAll('#daysCheckboxes input[type="checkbox"]').forEach(cb => {
-          cb.checked = selectedDays.includes(cb.value);
-        });
-        renderTimeSlots();
-        document.getElementById('breakStartInput').value = breakTime.start || '';
-        document.getElementById('breakEndInput').value   = breakTime.end   || '';
-        hardConstraints.forEach(c => renderHardConstraintCard(c.id, document.getElementById('hardConstraintsContainer')));
-        softConstraints.forEach(c => renderSoftConstraintCard(c.id, document.getElementById('softConstraintsContainer')));
-        renderAssignmentMatrix();
-
-        markDirty();
-        showAlert(`Sample school loaded — ${standards.length} standards, ${allDivisions().length} divisions, ${faculty.length} teachers. Scroll down and press "Generate schedule".`, 'success');
-        document.getElementById('generateBtn').scrollIntoView({ behavior: 'smooth', block: 'center' });
-
-      } catch (err) {
-        showAlert('Error: ' + err.message, 'error');
-      } finally {
-        btn.disabled = false;
-        btn.textContent = originalLabel;
-      }
-    }
-
-    // ── Preferences / improve ───────────────────────────────────────────
-    let currentSolutionGenes = null;
-    let currentStats         = null;
-    let previousResult       = null;   // snapshot to fall back to after an improve
-
-    function softScoreText(stats) {
-      if (!stats || !stats.softTotal) return 'No soft constraints defined — nothing to optimise.';
-      return `${stats.softMet} of ${stats.softTotal} preference${stats.softTotal === 1 ? '' : 's'} met.`;
-    }
-
-    function renderPreferenceSummary(stats) {
-      const block = document.getElementById('preferencesBlock');
-      const hasSoft = stats && stats.softTotal > 0;
-      block.style.display = 'block';
-
-      const penalty = stats && stats.softPenalty;
-      const scoreBit = (penalty !== undefined && penalty !== null)
-        ? ` Preference score ${penalty} (lower is better).` : '';
-
-      document.getElementById('preferenceSummary').textContent = hasSoft
-        ? `${softScoreText(stats)}${scoreBit} Hard constraints are fully satisfied — you can spend more time trying to do better on preferences.`
-        : 'No soft constraints defined. Add some above if you want the scheduler to optimise for preferences.';
-
-      // Offer improvement whenever there is any penalty left, not only when a
-      // preference is fully unmet — a run can cut the penalty substantially
-      // without flipping any single constraint to "satisfied".
-      const roomToImprove = penalty === undefined || penalty === null
-        ? stats.softMet < stats.softTotal
-        : penalty > 0;
-      document.getElementById('improveBtn').style.display = hasSoft && roomToImprove ? 'inline-block' : 'none';
-      document.getElementById('improveComparison').innerHTML = '';
-    }
-
-    async function improveSchedule() {
-      if (!currentSolutionGenes) { showAlert('Generate a schedule first', 'error'); return; }
-      const improveBtn = document.getElementById('improveBtn');
-      if (improveBtn.disabled) return;
-
-      // Snapshot so the user can go back if they prefer the original
-      previousResult = {
-        filename: generatedFilename,
-        data: currentScheduleData,
-        genes: currentSolutionGenes,
-        stats: currentStats
-      };
-
-      improveBtn.disabled = true;
-      setGeneratingUi(true);
-      document.getElementById('loadingHeadline').textContent = 'Looking for a schedule that meets more preferences…';
-
-      try {
-        const res = await authFetch(`${API_BASE_URL}/api/improve-timetable`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            projectId: PROJ_ID,
-            genes: currentSolutionGenes,
-            standards, faculty, assignments, classrooms: getClassrooms(),
-            daysOfWeek: selectedDays, timeSlots: collectTimeSlots(),
-            hardConstraints, softConstraints, breakTime
-          })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Could not start the improvement run.');
-
-        activeJobId = data.jobId;
-        await pollJob(data.jobId, { improve: true });
-
-      } catch (err) {
-        showAlert('Error: ' + err.message, 'error');
-      } finally {
-        setGeneratingUi(false);
-        improveBtn.disabled = false;
-      }
-    }
-
-    function applyImprovedSchedule(data) {
-      const before = previousResult.stats;
-      const after  = data.stats;
-
-      applyGeneratedSchedule(data, { announce: false });
-
-      const panel = document.getElementById('improveComparison');
-
-      // The penalty is the real quality measure. "Preferences met" only flips
-      // when a constraint reaches zero violations, so a run can cut the penalty
-      // a long way without changing it — judging by met-count alone would throw
-      // a genuinely better schedule away.
-      const beforePenalty = before.softPenalty;
-      const afterPenalty  = after.softPenalty;
-      const havePenalty   = Number.isFinite(beforePenalty) && Number.isFinite(afterPenalty);
-      const better = havePenalty ? afterPenalty < beforePenalty
-                                 : (after.softMet || 0) > (before.softMet || 0);
-
-      if (!better) {
-        panel.innerHTML = `
-          <div style="margin-top:14px;padding:14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);">
-            <p style="margin:0;font-size:13px;color:var(--text-secondary);">
-              No further improvement found — the previous schedule was already the best this search could reach
-              (${softScoreText(before)}). Your schedule is unchanged.
-            </p>
-          </div>`;
-        keepPreviousSchedule({ silent: true });
-        return;
-      }
-
-      const pct = havePenalty && beforePenalty > 0
-        ? Math.round(((beforePenalty - afterPenalty) / beforePenalty) * 100) : null;
-
-      const metLine = (after.softMet || 0) > (before.softMet || 0)
-        ? `<li>Preferences fully met: <strong>${before.softMet} of ${before.softTotal}</strong> → <strong>${after.softMet} of ${after.softTotal}</strong></li>`
-        : `<li>Preferences fully met: unchanged at <strong>${after.softMet} of ${after.softTotal}</strong> — but the remaining ones are broken less often</li>`;
-
-      panel.innerHTML = `
-        <div style="margin-top:14px;padding:16px;background:var(--success-soft);border:1px solid var(--success-border);border-radius:var(--radius);">
-          <h4 style="margin:0 0 8px 0;font-size:14px;color:var(--success);">A better schedule was found</h4>
-          <ul style="margin:0 0 12px 0;padding-left:20px;font-size:13px;color:var(--text-secondary);line-height:1.6;">
-            ${havePenalty ? `<li>Preference score: <strong>${beforePenalty}</strong> → <strong>${afterPenalty}</strong>${pct !== null ? ` (${pct}% better)` : ''}</li>` : ''}
-            ${metLine}
-            <li>Hard constraints: still fully satisfied</li>
-          </ul>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="btn-secondary" style="margin-right:0;" onclick="keepImprovedSchedule()">Keep the new one</button>
-            <button class="btn-secondary" style="margin-right:0;" onclick="keepPreviousSchedule()">Keep the previous one</button>
-          </div>
-        </div>`;
-    }
-
-    function keepImprovedSchedule() {
-      previousResult = null;
-      document.getElementById('improveComparison').innerHTML = '';
-      renderPreferenceSummary(currentStats);
-      showAlert('Improved schedule kept.', 'success');
-    }
-
-    async function keepPreviousSchedule({ silent = false } = {}) {
-      if (!previousResult) return;
-      const restore = previousResult;
-      previousResult = null;
-      applyGeneratedSchedule(restore, { announce: false });
-
-      // Put the original back on the server too, so downloads and reloads match
-      if (PROJ_ID) {
-        try {
-          await authFetch(`${API_BASE_URL}/api/projects/${PROJ_ID}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              scheduleData: restore.data,
-              scheduleStats: restore.stats,
-              generatedFilename: restore.filename
-            })
-          });
-        } catch {}
-      }
-      if (!silent) showAlert('Kept the previous schedule.', 'info');
-    }
-
-    function showImpossiblePanel(reasons) {
-      document.getElementById('impossiblePanel')?.remove();
-      const panel = document.createElement('div');
-      panel.id = 'impossiblePanel';
-      panel.style.cssText = 'background:var(--danger-soft);border:1px solid var(--danger-border);border-radius:var(--radius);padding:18px;margin:18px 0;';
-      panel.innerHTML = `
-        <h3 style="color:var(--danger);margin:0 0 10px 0;font-size:15px;">This schedule is not possible</h3>
-        <p style="color:var(--text-secondary);font-size:13px;margin:0 0 10px 0;">The current inputs cannot produce a valid schedule. Please resolve the following:</p>
-        <ul style="margin:0;padding-left:20px;color:var(--danger);font-size:13px;line-height:1.6;">
-          ${reasons.map(r => `<li style="margin-bottom:6px;">${esc(r)}</li>`).join('')}
-        </ul>`;
-      document.getElementById('alertContainer').after(panel);
-    }
-
-    function renderSoftReport(report, conflicts) {
-      const section = document.getElementById('softReportSection');
-      const list    = document.getElementById('softReportList');
-      if (!report || report.length === 0) { section.style.display = 'none'; return; }
-      section.style.display = 'block';
-      list.innerHTML = report.map(r => {
-        const color = r.satisfied ? 'var(--success)' : 'var(--danger)';
-        return `<div style="padding:10px 14px;margin-bottom:8px;background:var(--surface);border:1px solid ${r.satisfied ? 'var(--success-border)' : 'var(--danger-border)'};border-radius:var(--radius);">
-          <div style="display:flex;justify-content:space-between;align-items:center;">
-            <span style="color:${color};font-size:13px;font-weight:600;">${esc(r.label || r.type)}</span>
-            <span style="color:var(--muted);font-size:11px;">weight: ${r.weight}</span>
-          </div>
-          <div style="color:var(--text-secondary);font-size:12px;margin-top:4px;">${esc(r.detail)}</div>
-          ${r.violations > 0 ? `<div style="color:var(--warning);font-size:11px;margin-top:2px;">${r.violations} violation(s)</div>` : ''}
-        </div>`;
-      }).join('');
-    }
-
-    function renderHardStatus(conflicts) {
-      const el = document.getElementById('hardConstraintStatus');
-      if (!hardConstraints.length) {
-        el.innerHTML = '<span style="color:var(--muted);font-size:13px;">No hard constraints defined.</span>';
-        return;
-      }
-      const typeLabels = {
-        faculty_unavailability:  'Faculty Unavailability',
-        faculty_first_half_only: 'Faculty First Half Only'
-      };
-      el.innerHTML = hardConstraints.map(hc => {
-        const ok    = conflicts === 0;
-        const color = ok ? 'var(--success)' : 'var(--danger)';
-        return `<div style="padding:8px 12px;margin-bottom:6px;background:var(--surface);border:1px solid ${ok ? 'var(--success-border)' : 'var(--danger-border)'};border-radius:var(--radius);font-size:13px;color:${color};">
-          ${esc(typeLabels[hc.type] || hc.type)}
-          ${conflicts > 0 ? '<span style="color:var(--muted);font-size:11px;"> — check for conflicts above</span>' : ' — satisfied'}
-        </div>`;
-      }).join('') || '<span style="color:var(--muted);font-size:13px;">No hard constraints.</span>';
-    }
-
-    function downloadExcel() {
-      if (!generatedFilename) {
-        showAlert('No schedule to download', 'error');
-        return;
-      }
-
-      try {
-        const link = document.createElement('a');
-        link.href = `${API_BASE_URL}/output/${generatedFilename}`;
-        link.download = generatedFilename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        showAlert('File downloaded', 'success');
-      } catch (error) {
-        showAlert('Error downloading file: ' + error.message, 'error');
-      }
-    }
-
-    function downloadAsImage() {
-      const element = document.getElementById('previewContainer');
-      if (!element) {
-        showAlert('No schedule to download', 'error');
-        return;
-      }
-
-      const script = document.createElement('script');
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-      document.head.appendChild(script);
-
-      script.onload = function () {
-        html2canvas(element, { backgroundColor: '#ffffff' }).then(canvas => {
-          const link = document.createElement('a');
-          link.href = canvas.toDataURL('image/png');
-          link.download = `spacetime_timetable_${Date.now()}.png`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          showAlert('Image downloaded', 'success');
-        });
-      };
-    }
-
-    // ── PDF Export Helpers ───────────────────────────────────────────
-    function _loadHtml2Pdf() {
-      return new Promise((resolve, reject) => {
-        if (window.html2pdf) { resolve(); return; }
-        const s = document.createElement('script');
-        s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-        s.onload = resolve;
-        s.onerror = () => reject(new Error('Failed to load html2pdf library'));
-        document.head.appendChild(s);
-      });
-    }
-
-    async function _exportElementAsPdf(element, filename) {
-      try {
-        await _loadHtml2Pdf();
-        // temporarily remove scroll clipping so the full table is captured
-        const wrappers = element.querySelectorAll('.table-wrapper');
-        wrappers.forEach(w => { w.style.overflow = 'visible'; });
-
-        await html2pdf().set({
-          margin:      [8, 6, 8, 6],
-          filename:    filename,
-          image:       { type: 'jpeg', quality: 0.95 },
-          html2canvas: { scale: 2, backgroundColor: '#FFFFFF', useCORS: true, scrollX: 0, scrollY: 0 },
-          jsPDF:       { unit: 'mm', format: 'a4', orientation: 'landscape' },
-          pagebreak:   { mode: ['avoid-all', 'css', 'legacy'] }
-        }).from(element).save();
-
-        wrappers.forEach(w => { w.style.overflow = ''; });
-        showAlert('PDF downloaded', 'success');
-      } catch (err) {
-        console.error('PDF export error:', err);
-        showAlert('Error generating PDF: ' + err.message, 'error');
-      }
-    }
-
-    function downloadAsPdf() {
-      const element = document.getElementById('previewContainer');
-      if (!element || !element.innerHTML.trim()) {
-        showAlert('No schedule to download', 'error');
-        return;
-      }
-      _exportElementAsPdf(element, `spacetime_timetable_${Date.now()}.pdf`);
-    }
-
-    function downloadStandardAsPdf(standardId, standardName) {
-      const element = document.getElementById(`table-${standardId}`);
-      if (!element || !element.innerHTML.trim()) {
-        showAlert('Generate the table first', 'error');
-        return;
-      }
-      const safeName = (standardName || standardId).replace(/[^a-zA-Z0-9_ -]/g, '');
-      _exportElementAsPdf(element, `${safeName}_timetable.pdf`);
-    }
-
-    function downloadFacultyAsPdf(safeId, facultyName) {
-      const element = document.getElementById(`${safeId}-table`);
-      if (!element || !element.innerHTML.trim()) {
-        showAlert('Open the timetable first', 'error');
-        return;
-      }
-      const safeName = (facultyName || safeId).replace(/[^a-zA-Z0-9_ -]/g, '');
-      _exportElementAsPdf(element, `${safeName}_timetable.pdf`);
-    }
-
-    function resetForm() {
-      if (confirm('Reset the entire form?')) {
-        standards = []; faculty = []; assignments = []; classrooms = []; selectedDays = [];
-        generatedFilename = null; timeSlotValues = [{ startTime: '', endTime: '' }];
-        hardConstraints = []; softConstraints = [];
-        breakTime = { start: '', end: '' };
-        document.getElementById('breakStartInput').value = '';
-        document.getElementById('breakEndInput').value   = '';
-        document.getElementById('standardsContainer').innerHTML  = '';
-        document.getElementById('facultyContainer').innerHTML    = '';
-        document.getElementById('roomContainer').innerHTML       = '';
-        document.getElementById('hardConstraintsContainer').innerHTML = '';
-        document.getElementById('softConstraintsContainer').innerHTML = '';
-        document.querySelectorAll('#daysCheckboxes input').forEach(cb => cb.checked = false);
-        renderTimeSlots();
-        renderAssignmentMatrix();
-        document.getElementById('outputSection').style.display = 'none';
-        document.getElementById('impossiblePanel')?.remove();
-        showAlert('Form cleared', 'info');
-      }
-    }
-
-    // ── Project load: restores all saved inputs + timetable on open ──
-    function esc(s) {
-      return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-    }
-
-    async function loadProjectData() {
-      renderTimeSlots(); // default empty slot first
-
-      if (!PROJ_ID) return; // no project = just blank form
-
-      // Show the project bar
-      document.getElementById('projectBar').style.display = 'flex';
-
-      try {
-        const res  = await authFetch(`${API_BASE_URL}/api/projects/${PROJ_ID}`);
-        const data = await res.json();
-        if (!data.success || !data.project) return;
-        const p = data.project;
-
-        document.getElementById('projectBarName').textContent = p.name;
-        document.title = p.name + ' · Schedura';
-
-        // Classrooms first — divisions reference rooms by id
-        (p.classrooms||[]).forEach(room => {
-          classrooms.push({ id: room.id, name: room.name });
-          renderRoomCard(room);
-        });
-
-        // Standards, divisions & courses — same renderer the add buttons use
-        (p.standards||[]).forEach(std => {
-          standards.push({
-            id: std.id,
-            name: std.name,
-            courses: (std.courses || []).map(c => ({ id: c.id, name: c.name, courseCode: c.courseCode })),
-            divisions: (std.divisions || []).map(d => ({ id: d.id, label: d.label, roomId: d.roomId ?? null }))
-          });
-          renderStandardCard(standards[standards.length - 1]);
-        });
-
-        // Faculty
-        (p.faculty||[]).forEach(fac => {
-          faculty.push({ id: fac.id, name: fac.name, facultyCode: fac.facultyCode });
-          renderFacultyCard(faculty[faculty.length - 1]);
-        });
-
-        // Days
-        if (p.selectedDays && p.selectedDays.length) {
-          selectedDays = [...p.selectedDays];
-          document.querySelectorAll('#daysCheckboxes input[type="checkbox"]').forEach(cb => {
-            cb.checked = selectedDays.includes(cb.value);
-          });
-        }
-
-        // Time slots
-        if (p.timeSlotValues && p.timeSlotValues.length) {
-          timeSlotValues = JSON.parse(JSON.stringify(p.timeSlotValues));
-          renderTimeSlots();
-        }
-
-        // Assignments (must be after standards + faculty)
-        (p.assignments||[]).forEach(asgn => {
-          assignments.push({
-            id: asgn.id, divisionId: asgn.divisionId ?? null,
-            courseId: asgn.courseId, facultyId: asgn.facultyId, timesPerWeek: asgn.timesPerWeek
-          });
-        });
-        renderAssignmentMatrix();
-
-        // Break time
-        if (p.breakTime) {
-          breakTime = p.breakTime;
-          if (p.breakTime.start) document.getElementById('breakStartInput').value = p.breakTime.start;
-          if (p.breakTime.end)   document.getElementById('breakEndInput').value   = p.breakTime.end;
-        }
-
-        // Hard constraints
-        (p.hardConstraints||[]).forEach(c => {
-          hardConstraints.push({ id: c.id, type: c.type, facultyId: c.facultyId||'', day: c.day||'', timeslot: c.timeslot||'', courseId: c.courseId||'', classroom: c.classroom||'' });
-          renderHardConstraintCard(c.id, document.getElementById('hardConstraintsContainer'));
-        });
-
-        // Soft constraints
-        (p.softConstraints||[]).forEach(c => {
-          softConstraints.push({ id: c.id, type: c.type, facultyId: c.facultyId||'', courseId: c.courseId||'', preference: c.preference||'morning', weight: c.weight||50, label: c.label||'' });
-          renderSoftConstraintCard(c.id, document.getElementById('softConstraintsContainer'));
-        });
-
-        // Restore generated timetable output
-        if (p.scheduleData) {
-          generatedFilename    = p.generatedFilename;
-          currentScheduleData  = p.scheduleData;
-          currentSolutionGenes = p.scheduleGenes || null;  // lets Improve reseed after a reload
-          currentStats         = p.scheduleStats || null;
-          if (p.scheduleStats) {
-            document.getElementById('conflictCount').textContent = p.scheduleStats.conflicts;
-            document.getElementById('fitnessScore').textContent  = p.scheduleStats.fitness;
-            document.getElementById('classCount').textContent    = p.scheduleStats.classCount;
-            renderSoftReport(p.scheduleStats.softReport || [], p.scheduleStats.conflicts);
-            renderHardStatus(p.scheduleStats.conflicts);
-            renderPreferenceSummary(p.scheduleStats);
-          }
-          createPreviewTable(p.scheduleData);
-          createStandardTimetables(p.scheduleData);
-          populateFacultyTimetableDropdown();
-          document.getElementById('outputSection').style.display = 'block';
-        }
-
-      } catch(err) {
-        console.error('Failed to load project:', err);
-      }
-    }
-
-    // Initial setup
-    loadProjectData().finally(renderAssignmentMatrix);
-  </script>
+<script src="/ui.js"></script>
+<script src="/editor.js"></script>
 </body>
-
 </html>

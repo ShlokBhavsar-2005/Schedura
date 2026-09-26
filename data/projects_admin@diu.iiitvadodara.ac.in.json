@@ -29,6 +29,13 @@
             "name": "hindi",
             "courseCode": "HI101"
           }
+        ],
+        "divisions": [
+          {
+            "id": "div-1790442997972-942e8y",
+            "label": "A",
+            "roomId": "room-1790442997971-kz6vos"
+          }
         ]
       },
       {
@@ -54,6 +61,13 @@
             "id": "course-1773288479416",
             "name": "hindi",
             "courseCode": "HI201"
+          }
+        ],
+        "divisions": [
+          {
+            "id": "div-1790442997972-gws1cp",
+            "label": "A",
+            "roomId": "room-1790442997971-brdidd"
           }
         ]
       }
@@ -85,54 +99,68 @@
         "id": "asgn-1773247532882",
         "courseId": "course-1773288174090",
         "facultyId": "faculty-1773288509980",
-        "timesPerWeek": 3
+        "timesPerWeek": 3,
+        "divisionId": "div-1790442997972-942e8y"
       },
       {
         "id": "assignment-1773288775552",
         "courseId": "course-1773288183347",
         "facultyId": "faculty-1773288560517",
-        "timesPerWeek": 3
+        "timesPerWeek": 3,
+        "divisionId": "div-1790442997972-942e8y"
       },
       {
         "id": "assignment-1773288782274",
         "courseId": "course-1773288241778",
         "facultyId": "faculty-1773288571705",
-        "timesPerWeek": 3
+        "timesPerWeek": 3,
+        "divisionId": "div-1790442997972-942e8y"
       },
       {
         "id": "assignment-1773288787901",
         "courseId": "course-1773288294532",
         "facultyId": "faculty-1773288584908",
-        "timesPerWeek": 3
+        "timesPerWeek": 3,
+        "divisionId": "div-1790442997972-942e8y"
       },
       {
         "id": "assignment-1773288795824",
         "courseId": "course-1773288382764",
         "facultyId": "faculty-1773288509980",
-        "timesPerWeek": 3
+        "timesPerWeek": 3,
+        "divisionId": "div-1790442997972-gws1cp"
       },
       {
         "id": "assignment-1773288801223",
         "courseId": "course-1773288459985",
         "facultyId": "faculty-1773288560517",
-        "timesPerWeek": 3
+        "timesPerWeek": 3,
+        "divisionId": "div-1790442997972-gws1cp"
       },
       {
         "id": "assignment-1773288806586",
         "courseId": "course-1773288471860",
         "facultyId": "faculty-1773288571705",
-        "timesPerWeek": 3
+        "timesPerWeek": 3,
+        "divisionId": "div-1790442997972-gws1cp"
       },
       {
         "id": "assignment-1773288813684",
         "courseId": "course-1773288479416",
         "facultyId": "faculty-1773288584908",
-        "timesPerWeek": 3
+        "timesPerWeek": 3,
+        "divisionId": "div-1790442997972-gws1cp"
       }
     ],
     "classrooms": [
-      "1001",
-      "1002"
+      {
+        "id": "room-1790442997971-kz6vos",
+        "name": "1001"
+      },
+      {
+        "id": "room-1790442997971-brdidd",
+        "name": "1002"
+      }
     ],
     "selectedDays": [
       "Monday",
@@ -161,15 +189,6 @@
         "timeslot": "",
         "courseId": "",
         "classroom": ""
-      },
-      {
-        "id": "hard-1774334828067",
-        "type": "room_restriction",
-        "facultyId": "",
-        "day": "",
-        "timeslot": "",
-        "courseId": "course-1773288174090",
-        "classroom": "1001"
       },
       {
         "id": "hard-1774334866321",

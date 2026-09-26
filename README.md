@@ -118,10 +118,17 @@ Constraints are defined by the user through the UI and sent to the backend as pa
 ├── server.js          # Express server, API routes, validation, Excel export
 ├── ga.js              # Genetic Algorithm implementation
 ├── package.json
+├── ga-worker.js       # Runs the GA on a worker thread
+├── demo-data.js       # Feasible-by-construction sample school
 ├── public/
-│   ├── login.html     # Login page
-│   ├── dashboard.html # Project management dashboard
-│   └── index.html     # Main timetable editor UI
+│   ├── app.css        # Shared design system (tokens, chrome, primitives)
+│   ├── ui.js          # Shared runtime: session, API, toasts, modals
+│   ├── login.html     # Sign-in page
+│   ├── dashboard.html # Project list
+│   ├── index.html     # Editor shell (seven steps)
+│   ├── editor.css     # Editor-specific styles
+│   ├── editor.js      # Editor logic and step router
+│   └── shared.html    # Public read-only timetable viewer
 ├── data/              # Per-user project data (auto-created)
 └── output/            # Generated Excel files (auto-created)
 ```
@@ -132,7 +139,8 @@ Constraints are defined by the user through the UI and sent to the backend as pa
 
 - **Generation hangs**: The GA has no time limit and will restart indefinitely until it finds a zero-conflict schedule. If a request hangs for a long time, the feasibility checker likely has a gap — the configuration may be mathematically impossible to schedule even though the pre-check passed.
 - **Constraints not being applied**: Verify that the constraint `type` string in the frontend form matches exactly what `ga.js` checks for in `checkHardConstraintViolations()` or `computeSoftPenalty()`.
-- **Auth issues**: Clear `sessionStorage` in the browser. If the token is expired or malformed, the session will silently fail. If the Google button doesn't render, check that `GOOGLE_CLIENT_ID` is set on the server and that the page's origin is listed under "Authorized JavaScript origins" for that OAuth client.
+- **Auth issues**: Sessions are an in-memory access token (30 min) plus an httpOnly `sch_rt` refresh cookie (30 days). To force a clean slate, delete that cookie in DevTools → Application → Cookies. An expired access token is refreshed silently; only a dead refresh cookie raises the "Signed out" overlay. If the Google button doesn't render, check that `GOOGLE_CLIENT_ID` is set on the server and that the page's origin is listed under "Authorized JavaScript origins" for that OAuth client.
+- **A URL 404s**: Pages are served from real routes (`/login`, `/projects`, `/projects/:id/:step`, `/s/:shareId`), registered *before* `express.static`. A step slug that is not in `STEP_SLUGS` falls through to a 404 by design.
 - **Excel export errors**: Errors in `createExcelTimetable()` are usually caused by unexpected null values in the formatted solution. Check the `formatSolution()` output first.
 
 ---

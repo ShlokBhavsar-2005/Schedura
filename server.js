@@ -5,6 +5,7 @@ const cors     = require('cors');
 const ExcelJS  = require('exceljs');
 const path     = require('path');
 const fs       = require('fs');
+const crypto   = require('crypto');
 const jwt      = require('jsonwebtoken');
 const { Worker } = require('worker_threads');
 const { OAuth2Client } = require('google-auth-library');
@@ -20,15 +21,87 @@ const JWT_SECRET      = process.env.JWT_SECRET || 'timetable_secret_change_me_in
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 const googleClient    = new OAuth2Client(GOOGLE_CLIENT_ID);
 
+// Sessions: a short-lived access token held only in the page's memory, plus a
+// long-lived httpOnly refresh cookie. That keeps you signed in across reloads
+// and restarts (the thing sessionStorage could never do) without ever handing
+// JavaScript a credential that is useful for more than half an hour.
+const ACCESS_TTL     = '30m';
+const REFRESH_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const REFRESH_COOKIE = 'sch_rt';
+
+function signAccessToken(user) {
+  return jwt.sign({ email: user.email, name: user.name, typ: 'access' }, JWT_SECRET, { expiresIn: ACCESS_TTL });
+}
+
+function signRefreshToken(user) {
+  return jwt.sign({ email: user.email, name: user.name, typ: 'refresh' }, JWT_SECRET, { expiresIn: REFRESH_TTL_MS / 1000 });
+}
+
+/** Read one cookie. express gives us res.cookie but not a parser for requests. */
+function readCookie(req, name) {
+  const raw = req.headers.cookie;
+  if (!raw) return null;
+  for (const part of raw.split(';')) {
+    const eq = part.indexOf('=');
+    if (eq === -1) continue;
+    if (part.slice(0, eq).trim() === name) {
+      try { return decodeURIComponent(part.slice(eq + 1).trim()); } catch { return null; }
+    }
+  }
+  return null;
+}
+
+function setRefreshCookie(req, res, user) {
+  res.cookie(REFRESH_COOKIE, signRefreshToken(user), {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure:   req.secure,          // needs trust proxy so Railway's TLS counts
+    maxAge:   REFRESH_TTL_MS,
+    path:     '/'
+  });
+}
+
+function clearRefreshCookie(req, res) {
+  res.clearCookie(REFRESH_COOKIE, { httpOnly: true, sameSite: 'lax', secure: req.secure, path: '/' });
+}
+
 // ─────────────────────────────────────────────
 // MIDDLEWARE
 // ─────────────────────────────────────────────
+// Railway (and any reverse proxy) terminates TLS upstream; without this
+// req.secure is always false and the session cookie never gets the Secure flag.
+app.set('trust proxy', 1);
+
 app.use(cors({
   origin: true,
   credentials: true
 }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+// ─────────────────────────────────────────────
+// PAGE ROUTES — real, linkable URLs
+// ─────────────────────────────────────────────
+// Every screen now has an address: /login, /projects, /projects/:id/:step and
+// /s/:shareId. Registered before express.static so the old .html paths redirect
+// instead of being served — a bookmarked /index.html used to open an editor
+// with no project attached.
+const STEP_SLUGS = ['standards', 'teachers', 'classrooms', 'timetable', 'assignments', 'rules', 'schedule'];
+const sendPage = file => (req, res) => res.sendFile(path.join(__dirname, 'public', file));
+
+app.get('/',               (req, res) => res.redirect('/projects'));
+app.get('/index.html',     (req, res) => res.redirect('/projects'));
+app.get('/dashboard.html', (req, res) => res.redirect('/projects'));
+app.get('/login.html',     (req, res) => res.redirect('/login'));
+
+app.get('/login',    sendPage('login.html'));
+app.get('/projects', sendPage('dashboard.html'));
+app.get('/projects/:id', (req, res) => res.redirect(`/projects/${encodeURIComponent(req.params.id)}/standards`));
+app.get('/projects/:id/:step', (req, res, next) => {
+  if (!STEP_SLUGS.includes(req.params.step)) return next();
+  sendPage('index.html')(req, res);
+});
+app.get('/s/:shareId', sendPage('shared.html'));
+
 app.use(express.static('public'));
 
 // Create output directory if it doesn't exist
@@ -46,6 +119,8 @@ if (!fs.existsSync(dataDir)) {
 // ─────────────────────────────────────────────
 // PROJECT STORAGE HELPERS
 // ─────────────────────────────────────────────
+
+const TRASH_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 
 /** Get the file path for a user's projects JSON */
 function userProjectsFile(email) {
@@ -66,6 +141,29 @@ function loadUserProjects(email) {
 function saveUserProjects(email, projects) {
   const file = userProjectsFile(email);
   fs.writeFileSync(file, JSON.stringify(projects, null, 2));
+}
+
+/**
+ * Find a project by its public share id, across every user's file.
+ *
+ * Projects are stored per-user, so a share id has no home of its own — scanning
+ * the data directory is the honest way to resolve one at this scale. If this ever
+ * grows past a few hundred files it wants a share-id → file index instead.
+ */
+function findSharedProject(shareId) {
+  if (!shareId) return null;
+  let files;
+  try { files = fs.readdirSync(dataDir).filter(f => f.startsWith('projects_') && f.endsWith('.json')); }
+  catch { return null; }
+
+  for (const file of files) {
+    let projects;
+    try { projects = JSON.parse(fs.readFileSync(path.join(dataDir, file), 'utf-8')); }
+    catch { continue; }
+    const hit = (projects || []).find(p => !p.deletedAt && p.share && p.share.enabled && p.share.id === shareId);
+    if (hit) return hit;
+  }
+  return null;
 }
 
 // ─────────────────────────────────────────────
@@ -170,15 +268,25 @@ function requireAuth(req, res, next) {
     : null;
 
   if (!token) {
-    return res.status(401).json({ success: false, error: 'Unauthorized – please log in.' });
+    return res.status(401).json({ success: false, error: 'Unauthorized – please log in.', code: 'no_token' });
   }
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
+    if (decoded.typ && decoded.typ !== 'access') {
+      return res.status(401).json({ success: false, error: 'Wrong token type.', code: 'bad_token' });
+    }
     req.user = decoded;
     next();
-  } catch {
-    return res.status(401).json({ success: false, error: 'Session expired – please log in again.' });
+  } catch (err) {
+    // The client reacts differently to these: an expired access token is
+    // refreshed silently, anything else means sign in again.
+    const expired = err && err.name === 'TokenExpiredError';
+    return res.status(401).json({
+      success: false,
+      error: expired ? 'Access token expired.' : 'Invalid session.',
+      code:  expired ? 'token_expired' : 'bad_token'
+    });
   }
 }
 
@@ -222,7 +330,8 @@ app.post('/api/auth/google', async (req, res) => {
     const email = payload.email.toLowerCase();
     const name  = payload.name || email.split('@')[0];
 
-    const token = jwt.sign({ email, name }, JWT_SECRET, { expiresIn: '8h' });
+    setRefreshCookie(req, res, { email, name });
+    const token = signAccessToken({ email, name });
 
     console.log(`✓ Google login: ${email}`);
     res.json({ success: true, token, email, name });
@@ -234,9 +343,32 @@ app.post('/api/auth/google', async (req, res) => {
 });
 
 /**
- * POST /api/logout  (client just discards token, but this confirms it)
+ * POST /api/auth/refresh
+ * Trades the httpOnly refresh cookie for a fresh access token. This is what
+ * makes a reload (or coming back tomorrow) keep you signed in.
+ */
+app.post('/api/auth/refresh', (req, res) => {
+  const raw = readCookie(req, REFRESH_COOKIE);
+  if (!raw) return res.status(401).json({ success: false, error: 'No session.' });
+
+  try {
+    const decoded = jwt.verify(raw, JWT_SECRET);
+    if (decoded.typ !== 'refresh') throw new Error('not a refresh token');
+    const user = { email: decoded.email, name: decoded.name };
+    // Rolling expiry: active users never get logged out mid-use.
+    setRefreshCookie(req, res, user);
+    res.json({ success: true, token: signAccessToken(user), email: user.email, name: user.name });
+  } catch {
+    clearRefreshCookie(req, res);
+    res.status(401).json({ success: false, error: 'Session expired – please sign in again.' });
+  }
+});
+
+/**
+ * POST /api/logout – clears the refresh cookie so the session really ends.
  */
 app.post('/api/logout', (req, res) => {
+  clearRefreshCookie(req, res);
   res.json({ success: true, message: 'Logged out.' });
 });
 
@@ -253,14 +385,32 @@ app.get('/api/me', requireAuth, (req, res) => {
 
 /** GET /api/projects  – list all projects for logged-in user */
 app.get('/api/projects', requireAuth, (req, res) => {
-  const projects = loadUserProjects(req.user.email);
+  let projects = loadUserProjects(req.user.email);
+
+  // Deletes are soft for 30 days so "Undo" can actually put a project back.
+  // Anything older than that is dropped here, on the next visit.
+  const cutoff = Date.now() - TRASH_TTL_MS;
+  const kept = projects.filter(p => !p.deletedAt || new Date(p.deletedAt).getTime() > cutoff);
+  if (kept.length !== projects.length) {
+    saveUserProjects(req.user.email, kept);
+    projects = kept;
+  }
+  projects = projects.filter(p => !p.deletedAt);
   // Return list without bulky scheduleData to keep response small
   const summary = projects.map(p => ({
     id: p.id,
     name: p.name,
     createdAt: p.createdAt,
     updatedAt: p.updatedAt,
-    hasOutput: !!p.scheduleData
+    lastGeneratedAt: p.lastGeneratedAt || null,
+    hasOutput: !!p.scheduleData,
+    shared: !!(p.share && p.share.enabled),
+    counts: {
+      standards: (p.standards || []).length,
+      divisions: (p.standards || []).reduce((n, s) => n + (s.divisions || []).length, 0),
+      faculty:   (p.faculty || []).length,
+      classes:   p.scheduleStats ? Number(p.scheduleStats.classCount) || 0 : 0
+    }
   }));
   res.json({ success: true, projects: summary });
 });
@@ -268,7 +418,7 @@ app.get('/api/projects', requireAuth, (req, res) => {
 /** GET /api/projects/:id  – get full project (with inputs + output) */
 app.get('/api/projects/:id', requireAuth, (req, res) => {
   const projects = loadUserProjects(req.user.email);
-  const project  = projects.find(p => p.id === req.params.id);
+  const project  = projects.find(p => p.id === req.params.id && !p.deletedAt);
   if (!project) return res.status(404).json({ success: false, error: 'Project not found.' });
 
   // Older projects predate divisions / classroom objects — upgrade on read so the
@@ -314,7 +464,7 @@ app.post('/api/projects', requireAuth, (req, res) => {
 /** PUT /api/projects/:id  – save/update project (inputs + optionally output) */
 app.put('/api/projects/:id', requireAuth, (req, res) => {
   const projects = loadUserProjects(req.user.email);
-  const idx = projects.findIndex(p => p.id === req.params.id);
+  const idx = projects.findIndex(p => p.id === req.params.id && !p.deletedAt);
   if (idx === -1) return res.status(404).json({ success: false, error: 'Project not found.' });
 
   // ── Validate uniqueness of IDs in any input data being saved ──
@@ -385,14 +535,96 @@ app.put('/api/projects/:id', requireAuth, (req, res) => {
   res.json({ success: true, project: projects[idx] });
 });
 
-/** DELETE /api/projects/:id  – delete project */
+/**
+ * POST /api/projects/:id/share  – create (or re-enable) a public read-only link
+ *
+ * A timetable exists to be handed to 27 teachers and 18 classes, so there has to
+ * be a way out of the app that isn't "download a file and email it". The link
+ * exposes the generated schedule only — never the inputs, the constraints, or
+ * anything else on the project.
+ */
+app.post('/api/projects/:id/share', requireAuth, (req, res) => {
+  const projects = loadUserProjects(req.user.email);
+  const project  = projects.find(p => p.id === req.params.id);
+  if (!project) return res.status(404).json({ success: false, error: 'Project not found.' });
+
+  if (!project.share || !project.share.id) {
+    project.share = { id: crypto.randomBytes(9).toString('base64url'), createdAt: new Date().toISOString(), enabled: true };
+  } else {
+    project.share.enabled = true;
+  }
+  saveUserProjects(req.user.email, projects);
+  res.json({ success: true, share: project.share });
+});
+
+/** DELETE /api/projects/:id/share  – turn the public link off (id is kept) */
+app.delete('/api/projects/:id/share', requireAuth, (req, res) => {
+  const projects = loadUserProjects(req.user.email);
+  const project  = projects.find(p => p.id === req.params.id);
+  if (!project) return res.status(404).json({ success: false, error: 'Project not found.' });
+  if (project.share) project.share.enabled = false;
+  saveUserProjects(req.user.email, projects);
+  res.json({ success: true, share: project.share || null });
+});
+
+/**
+ * GET /api/shared/:shareId  – public, no auth. Returns the schedule only.
+ */
+app.get('/api/shared/:shareId', (req, res) => {
+  const found = findSharedProject(req.params.shareId);
+  if (!found) return res.status(404).json({ success: false, error: 'This link is no longer active.' });
+
+  res.json({
+    success: true,
+    name: found.name,
+    generatedAt: found.lastGeneratedAt || found.updatedAt || null,
+    schedule: found.scheduleData || null,
+    stats: found.scheduleStats
+      ? { classCount: found.scheduleStats.classCount, conflicts: found.scheduleStats.conflicts }
+      : null
+  });
+});
+
+/**
+ * DELETE /api/projects/:id  – move to trash (or ?purge=1 to erase now)
+ *
+ * Soft by default. The id survives, so restoring keeps the project's URL and
+ * any share link working — which is what makes the Undo on the dashboard a real
+ * undo rather than a re-creation that quietly loses both.
+ */
 app.delete('/api/projects/:id', requireAuth, (req, res) => {
   let projects = loadUserProjects(req.user.email);
-  const exists = projects.some(p => p.id === req.params.id);
-  if (!exists) return res.status(404).json({ success: false, error: 'Project not found.' });
-  projects = projects.filter(p => p.id !== req.params.id);
+  const idx = projects.findIndex(p => p.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ success: false, error: 'Project not found.' });
+
+  if (req.query.purge === '1') {
+    projects = projects.filter(p => p.id !== req.params.id);
+  } else {
+    projects[idx].deletedAt = new Date().toISOString();
+    // A trashed project stops being publicly reachable immediately. The flag
+    // records that the delete is what switched it off, so restoring can put it
+    // back — an undo that silently leaves the link dead is not an undo.
+    if (projects[idx].share && projects[idx].share.enabled) {
+      projects[idx].share.enabled = false;
+      projects[idx].share.disabledByDelete = true;
+    }
+  }
   saveUserProjects(req.user.email, projects);
   res.json({ success: true });
+});
+
+/** POST /api/projects/:id/restore  – undo a delete */
+app.post('/api/projects/:id/restore', requireAuth, (req, res) => {
+  const projects = loadUserProjects(req.user.email);
+  const project  = projects.find(p => p.id === req.params.id);
+  if (!project) return res.status(404).json({ success: false, error: 'Project not found.' });
+  delete project.deletedAt;
+  if (project.share && project.share.disabledByDelete) {
+    project.share.enabled = true;
+    delete project.share.disabledByDelete;
+  }
+  saveUserProjects(req.user.email, projects);
+  res.json({ success: true, project: { id: project.id, name: project.name } });
 });
 
 // ─────────────────────────────────────────────
@@ -645,6 +877,25 @@ async function finishJob(job, solution) {
       projects[idx].scheduleGenes     = solution.genes;
       projects[idx].generatedFilename = filename;
       projects[idx].updatedAt         = new Date().toISOString();
+      projects[idx].lastGeneratedAt   = projects[idx].updatedAt;
+
+      // A short run history, so a schedule has a past and not only a present —
+      // "last generated Thursday, 540 classes, 0 conflicts" is most of what
+      // makes a tool feel lived-in rather than freshly booted.
+      const run = {
+        id:          uid('run'),
+        at:          projects[idx].updatedAt,
+        mode:        job.mode === 'improve' ? 'improve' : 'generate',
+        durationMs:  Date.now() - job.startedAt,
+        classCount:  stats.classCount,
+        conflicts:   stats.conflicts,
+        fitness:     stats.fitness,
+        softMet:     stats.softMet,
+        softTotal:   stats.softTotal,
+        softPenalty: stats.softPenalty
+      };
+      projects[idx].runs = [run, ...(projects[idx].runs || [])].slice(0, 12);
+
       saveUserProjects(job.owner, projects);
     }
   }

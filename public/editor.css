@@ -1,0 +1,386 @@
+/* ==========================================================================
+   Schedura — editor
+   --------------------------------------------------------------------------
+   Only what is specific to the step-by-step editor. Tokens, chrome and the
+   shared primitives live in app.css.
+   ========================================================================== */
+
+.container {
+  max-width: 1060px;
+  margin: 0 auto;
+  padding: 30px 24px 72px;
+}
+
+/* ── Blocks inside a step ───────────────────────────────────────────────── */
+
+.block {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.block > h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 5px;
+  color: var(--text);
+}
+
+.block > p.hint {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: 0 0 15px;
+  line-height: 1.55;
+}
+
+.demo-panel { margin-bottom: 18px; }
+
+/* ── Form layout ────────────────────────────────────────────────────────── */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+}
+
+.sub-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  padding: 12px;
+  border-radius: var(--radius);
+  margin-bottom: 10px;
+}
+
+.sub-card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+/* ── Checkbox group ─────────────────────────────────────────────────────── */
+
+.checkbox-group { display: flex; gap: 10px; flex-wrap: wrap; }
+
+.checkbox-group label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 0;
+  cursor: pointer;
+  font-weight: 400;
+  font-size: 13.5px;
+  color: var(--text-secondary);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px 13px;
+  transition: border-color .15s, background .15s;
+  user-select: none;
+}
+
+.checkbox-group label:hover { border-color: var(--border-strong); background: var(--surface-alt); }
+
+.checkbox-group label:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.checkbox-group input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--accent);
+}
+
+/* ── Periods ────────────────────────────────────────────────────────────── */
+
+.time-slots-container {
+  background: var(--surface-alt);
+  padding: 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+}
+
+.time-slot-group {
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.time-slot-group:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+/* ── Constraints ────────────────────────────────────────────────────────── */
+
+.constraint-group {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.constraint-group > h3 {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.constraint-group > h3 .tag {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  padding: 2px 7px;
+  border-radius: 3px;
+}
+
+.tag-hard { background: var(--danger-soft);  color: var(--danger);  border: 1px solid var(--danger-border); }
+.tag-soft { background: var(--success-soft); color: var(--success); border: 1px solid var(--success-border); }
+
+.constraint-group > p {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: 0 0 14px;
+  line-height: 1.5;
+}
+
+/* ── Assignment matrix ──────────────────────────────────────────────────── */
+
+.matrix-standard {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  margin-bottom: 16px;
+}
+
+.matrix-standard > h3 {
+  font-size: 14.5px;
+  font-weight: 600;
+  margin: 0 0 3px;
+}
+
+.matrix-standard > p {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: 0 0 14px;
+}
+
+/* ── Output ─────────────────────────────────────────────────────────────── */
+
+#outputSection { display: none; }
+
+.output-block {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 16px;
+}
+
+.output-block > h3 {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0 0 4px;
+  color: var(--text);
+}
+
+.output-block > p.hint {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: 0 0 14px;
+}
+
+.output-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+
+.export-btn-row {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.result-card {
+  margin: 0 0 16px;
+  padding: 16px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.result-card h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 10px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin: 0 0 18px;
+}
+
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 16px;
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+.stat-card h3 {
+  margin: 0 0 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+.stat-card .value {
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--accent);
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+/* ── Run history ────────────────────────────────────────────────────────── */
+
+.run-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.run-row:last-child { border-bottom: none; }
+
+.run-when { font-weight: 500; min-width: 128px; }
+
+.run-detail {
+  color: var(--muted);
+  font-size: 12.5px;
+  flex: 1;
+}
+
+.run-mode {
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--muted);
+  background: var(--surface-sunken);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 2px 6px;
+}
+
+/* ── Readiness panel ────────────────────────────────────────────────────── */
+
+.ready-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+
+.ready-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.ready-item.ok   svg { color: var(--success); }
+.ready-item.bad  svg { color: var(--danger); }
+.ready-item.bad  { color: var(--danger); }
+.ready-item svg { flex-shrink: 0; margin-top: 2px; }
+
+.ready-item button {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  font-family: inherit;
+}
+
+/* ── Loading ────────────────────────────────────────────────────────────── */
+
+.loading {
+  display: none;
+  text-align: center;
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin: 16px 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.loading.active { display: block; }
+.loading p { margin: 12px 0 0; }
+
+/* ── Alerts (in-page, for validation detail) ────────────────────────────── */
+
+.alert {
+  padding: 12px 14px;
+  margin: 0 0 14px;
+  border-radius: var(--radius);
+  display: none;
+  font-size: 13.5px;
+  line-height: 1.55;
+  white-space: pre-line;
+}
+
+.alert.active { display: block; }
+
+.alert-success { background: var(--success-soft); color: var(--success); border: 1px solid var(--success-border); }
+.alert-error   { background: var(--danger-soft);  color: var(--danger);  border: 1px solid var(--danger-border); }
+.alert-info    { background: var(--accent-soft);  color: var(--accent);  border: 1px solid var(--accent-border); }
+
+/* ── Mobile ─────────────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .container { padding: 20px 14px 56px; }
+  .block, .constraint-group, .output-block, .matrix-standard { padding: 16px; }
+  .grid { grid-template-columns: 1fr; }
+  .sub-card-grid { grid-template-columns: 1fr; }
+  .stats-grid { grid-template-columns: 1fr; }
+
+  th, td { padding: 8px 6px; font-size: 12px; }
+
+  .output-actions { justify-content: stretch; }
+  .output-actions .btn { flex: 1 1 auto; min-width: 0; }
+
+  .step-nav { flex-wrap: wrap; }
+  .step-nav .btn { flex: 1 1 auto; }
+  .step-nav-hint { width: 100%; text-align: left; order: 3; }
+
+  .run-row { flex-wrap: wrap; gap: 6px; }
+  .run-when { min-width: 0; }
+}

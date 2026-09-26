@@ -5,7 +5,7 @@ This document is designed to provide an AI assistant with a rapid, comprehensive
 ## 1. Project Overview
 This is a full-stack vanilla JavaScript web application built with a **Node.js/Express** backend and a **Genetic Algorithm (GA)** to generate conflict-free academic timetables. It supports multiple users, project management, customizable hard/soft constraints, and exports schedules to Excel.
 
-*   **Frontend**: Vanilla HTML/JS/CSS (`index.html`, `dashboard.html`, `login.html`). No modern frameworks. Uses `sessionStorage` for JWT tokens. Login is via Google Sign-In (Google Identity Services button).
+*   **Frontend**: Vanilla HTML/JS/CSS, no frameworks. Shared `app.css` + `ui.js`; pages are `login.html`, `dashboard.html`, `index.html` (+ `editor.js`/`editor.css`) and the public `shared.html`. Every screen has a real URL (`/login`, `/projects`, `/projects/:id/:step`, `/s/:shareId`). Login is Google Sign-In; the access token lives in memory and is renewed from an httpOnly `sch_rt` refresh cookie.
 *   **Backend**: Node.js, Express (`server.js`). Handles authentication, CRUD operations on JSON files, running the Genetic Algorithm, and generating Excel files.
 *   **Database**: Flat JSON files (e.g., `data/projects_<email>.json` for project data). No local user table — identity comes from a verified Google ID token, and any Google account can use the app.
 
@@ -16,17 +16,24 @@ This is a full-stack vanilla JavaScript web application built with a **Node.js/E
     *   `/api/generate-timetable`: The core endpoint. Handles validation (`validateInput`), mathematical feasibility (`checkFeasibility`), executes the GA, and formats the output.
     *   Excel Generation: Uses `exceljs` to render the output table (`createExcelTimetable`).
 *   **`ga.js` (800+ lines)**: Contains the `GeneticAlgorithm` class. It manages the evolutionary process (population, fitness, selection, crossover, mutation, conflict repair) to find a schedule that breaks 0 hard constraints and minimizes soft constraint penalties.
-*   **`public/index.html` (1900+ lines)**: The primary timetable editor UI. It manages a massive DOM-based form (standards, courses, faculty, assignments, constraints), sends the JSON payload to the backend, and visually renders the generated timetable.
+*   **`public/index.html` + `public/editor.js`**: The editor, split into seven steps (standards · classrooms · teachers · timetable · assignments · rules · schedule) rather than one scrolling form. `index.html` is the shell of step panels; `editor.js` holds the model, the renderers, the step router (`STEPS`, `goToStep`, `stepGap`, `stepDone`), autosave, and the generate/improve flow.
+*   **`public/ui.js`**: Shared browser runtime — `Schedura.api()` (token, silent refresh, re-auth overlay), toasts with Undo, modal `confirm`/`promptText`, offline banner, favicon, relative-time formatting.
+*   **`public/shared.html`**: Public read-only viewer for `/s/:shareId`. Serves the generated schedule only; inputs and rules are never exposed.
+*   **`ga-worker.js`**: Runs the GA on a worker thread so the server stays responsive and a run can be cancelled.
+*   **`demo-data.js`**: Builds a valid week first and derives a sample school from it, so the demo is guaranteed solvable.
 *   **`constraints_explanation.md`**: Detailed documentation explaining the logic behind hard and soft constraints.
 
 ## 3. Core Data Models
 A **Project** object (stored in `data/projects_<email>.json`) contains the following key properties:
 *   `standards`: Array of student classes (e.g. "8-A"). Each standard contains an array of `courses`.
 *   `faculty`: Array of teachers with `id`, `name`, and `facultyCode`.
-*   `classrooms`: Array of strings representing available rooms.
+*   `classrooms`: Array of `{ id, name }`. A division pins to a room by `id`, so renaming a room cannot break the link.
 *   `timeSlotValues`: Array of `{ startTime, endTime }` pairs.
 *   `selectedDays`: Array of strings (e.g., "Monday").
-*   `assignments`: The core input mapping. Maps `{ courseId, facultyId, timesPerWeek }`.
+*   `assignments`: The core input mapping. Each is `{ id, divisionId, courseId, facultyId, timesPerWeek }` — keyed on the *division*, which is what actually gets scheduled.
+*   `runs`: Up to 12 recent generations — `{ at, mode, durationMs, classCount, conflicts, softMet, softTotal }`.
+*   `share`: `{ id, createdAt, enabled }` when a public link exists.
+*   `deletedAt`: Set by a soft delete; the project is hidden for 30 days, then purged.
 *   `hardConstraints` & `softConstraints`: Arrays of rule objects defined by the user.
 
 A **Gene** (in the Genetic Algorithm):
@@ -59,4 +66,4 @@ Constraints are defined on the frontend, sent to the backend, and heavily impact
 *   **Timetable never finishes / hangs**: Check the `ga.js` stagnation/restart loop. There is no time limit — the GA restarts until it reaches 0 conflicts, so a hang means the `checkFeasibility` logic in `server.js` is missing a mathematical edge case.
 *   **Missing or duplicated constraints**: Ensure the DOM IDs map correctly to `hardConstraints` or `softConstraints` arrays in `index.html`, and ensure `ga.js` specifically looks for that `constraint.type` string.
 *   **Excel Export issues**: Handled in `server.js` -> `createExcelTimetable()`. Columns are dynamically generated via `excelColName()`.
-*   **State / Auth issues**: Clear `sessionStorage` in the browser. Verify `data/projects_<email>.json` has valid JSON syntax.
+*   **State / Auth issues**: Delete the httpOnly `sch_rt` cookie to force a fresh sign-in (it cannot be cleared from script). Verify `data/projects_<email>.json` has valid JSON syntax.

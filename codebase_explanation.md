@@ -28,10 +28,17 @@ timetabletest/
 ├── ga.js                  # Genetic Algorithm implementation
 ├── package.json           # Node.js dependencies and scripts
 ├── PROJECToverview.md     # (Ignored as per request)
+├── ga-worker.js           # Worker-thread entry point for the GA
+├── demo-data.js           # Sample school generator
 ├── public/                # Static web assets
-│   ├── index.html         # Main timetable creation page
-│   ├── login.html         # Login page
-│   └── dashboard.html     # User dashboard for project management
+│   ├── app.css            # Shared design system
+│   ├── ui.js              # Shared runtime (session, API, toasts, modals)
+│   ├── index.html         # Editor shell — seven step panels
+│   ├── editor.css         # Editor-specific styles
+│   ├── editor.js          # Editor logic + step router
+│   ├── login.html         # Sign-in page
+│   ├── dashboard.html     # Project list
+│   └── shared.html        # Public read-only timetable viewer
 ├── data/                  # User project data (JSON files per user)
 │   └── projects_<email>.json
 └── output/                # Generated Excel timetable files
@@ -96,20 +103,26 @@ timetabletest/
 3. Evolve through generations until zero conflicts
 4. Return best solution with schedule data
 
-### 3. Frontend (public/*.html)
+### 3. Frontend (public/)
 
-**Static HTML pages** with embedded CSS/JS:
+Vanilla HTML/CSS/JS, but no longer one file per page: `app.css` and `ui.js`
+are shared by every page, and the editor's own CSS and JS sit beside its shell.
 
-- **login.html**: "Sign in with Google" button (Google Identity Services)
-- **dashboard.html**: Project listing, creation, editing
-- **index.html**: Main timetable builder interface
+- **login.html**: "Sign in with Google" (Google Identity Services). Honours
+  `?next=` so a deep link survives the sign-in round trip.
+- **dashboard.html**: Project list, search, create/rename/duplicate/delete.
+- **index.html + editor.js**: The editor, as seven steps rather than one long
+  form. Each step has its own URL, so browser back and forward walk them.
+- **shared.html**: The public read-only viewer behind `/s/:shareId`.
 
 **Features**:
 - Light "cream paper" theme with IBM Plex fonts
-- Responsive design
-- Client-side form validation
-- AJAX calls to backend APIs
-- Dynamic UI for adding/removing entities
+- Responsive down to phone width
+- Step-by-step navigation with a progress stepper (URL, keyboard, swipe)
+- Toasts with Undo in place of blocking `confirm()` dialogs
+- Autosave with a persistent save state, offline hold, and retry
+- Silent token refresh; a dead session raises an overlay instead of
+  discarding the page
 
 ## Data Flow
 
@@ -166,9 +179,11 @@ timetabletest/
    Server runs on http://localhost:5000
 
 4. **Access Application**:
-   - Login: http://localhost:5000/login.html
-   - Dashboard: http://localhost:5000/dashboard.html
-   - Main App: http://localhost:5000/
+   - Sign in:  http://localhost:5000/login
+   - Projects: http://localhost:5000/projects
+   - Editor:   http://localhost:5000/projects/:id/:step
+     (step ∈ standards · classrooms · teachers · timetable · assignments · rules · schedule)
+   - Shared:   http://localhost:5000/s/:shareId  (public, no sign-in)
 
 ## Key Files Description
 
@@ -187,21 +202,32 @@ timetabletest/
 - Individual representation (genes for assignments)
 - Constraint-aware initialization and repair
 
-### public/index.html (Main Interface)
-- Form for defining standards, courses, faculty, assignments
-- Constraint configuration
-- AJAX submission to generate timetable
-- Results display with download link
+### public/app.css + public/ui.js (Shared)
+- `app.css`: design tokens, top bar, stepper, buttons, fields, modals,
+  toasts, empty states, skeletons, offline banner
+- `ui.js`: `Schedura.api()` (bearer token + silent refresh + re-auth overlay),
+  `Schedura.toast()` with Undo, `confirm`/`promptText`/`modal`, the
+  connection banner, the inline SVG favicon, `relTime()`
+
+### public/index.html + editor.js + editor.css (Editor)
+- Shell holds seven `.step-panel` sections; `editor.js` owns the router
+- `STEPS` / `stepGap()` / `stepDone()` drive the stepper ticks, the hint
+  beside Next, and the readiness list on the schedule step
+- Autosave, undo-able removals, run history, share dialog, exports
 
 ### public/dashboard.html (Project Management)
-- List user's projects
-- Create/edit/delete projects
-- Navigation to timetable builder
+- List, search, create, rename, duplicate
+- Delete is a trash move with a real Undo (the id, URL and share link survive)
 
 ### public/login.html (Authentication)
 - Google Identity Services "Sign in with Google" button
 - Posts the Google ID token to `/api/auth/google`
-- JWT token storage in `sessionStorage`
+- Access token is held in memory only; continuity comes from the httpOnly
+  `sch_rt` refresh cookie
+
+### public/shared.html (Public viewer)
+- Reads `/api/shared/:shareId` — schedule only, no inputs or rules
+- By-division and by-teacher views, printable
 
 ### data/projects_*.json (Project Data)
 - Per-user project storage

@@ -2,89 +2,77 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Sign in · Schedura</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Sign in · Schedura</title>
+  <meta name="description" content="Schedura builds conflict-free school timetables. Enter your standards, divisions, teachers and rules, and get a complete week that satisfies every constraint." />
+  <meta name="theme-color" content="#F5F2EB" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Schedura" />
+  <meta property="og:title" content="Schedura — conflict-free school timetables" />
+  <meta property="og:description" content="Enter your standards, divisions, teachers and rules. Schedura searches for a complete week that satisfies every constraint, then hands it to you as a timetable you can share." />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="Schedura — conflict-free school timetables" />
+  <meta name="twitter:description" content="Timetable planning that resolves every clash before you see it." />
+
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/app.css" />
   <script src="https://accounts.google.com/gsi/client" async defer></script>
+
   <style>
-    :root {
-      --bg:             #F5F2EB;
-      --surface:        #FFFFFF;
-      --surface-alt:    #FBF9F4;
-      --border:         #E0DACE;
-      --border-strong:  #C8C0AF;
-      --text:           #1F232B;
-      --text-secondary: #4A4F59;
-      --muted:          #7C776E;
-      --accent:         #2C4A70;
-      --danger:         #A32B22;
-      --danger-soft:    #FAEDEC;
-      --danger-border:  #E6C5C2;
-      --success:        #2A6B47;
-      --success-soft:   #EBF3EE;
-      --success-border: #BFD9CB;
-      --radius:         6px;
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
     body {
-      min-height: 100vh;
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'IBM Plex Sans', system-ui, sans-serif;
       display: flex;
       align-items: center;
       justify-content: center;
       padding: 24px;
-      -webkit-font-smoothing: antialiased;
     }
 
-    .login-wrapper { width: 100%; max-width: 400px; }
+    .login-wrapper { width: 100%; max-width: 408px; }
 
-    .brand { text-align: center; margin-bottom: 32px; }
+    .brand { text-align: center; margin-bottom: 30px; }
+
+    .brand-mark {
+      width: 42px; height: 42px;
+      border-radius: 10px;
+      background: var(--accent);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 16px;
+      color: #F5F2EB;
+    }
 
     .brand h1 {
       font-family: 'IBM Plex Serif', Georgia, serif;
-      font-size: 32px;
+      font-size: 30px;
       font-weight: 600;
-      letter-spacing: -0.01em;
-      color: var(--text);
-    }
-
-    .brand .rule {
-      width: 36px;
-      height: 2px;
-      background: var(--accent);
-      margin: 14px auto 12px;
+      margin: 0 0 8px;
     }
 
     .brand p {
       color: var(--muted);
       font-size: 13.5px;
-      line-height: 1.5;
+      line-height: 1.55;
+      margin: 0;
     }
 
-    .card {
+    .card-login {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 32px 28px;
-      box-shadow: 0 1px 3px rgba(31,35,43,0.05);
+      border-radius: var(--radius-lg);
+      padding: 30px 28px;
+      box-shadow: var(--shadow-sm);
       text-align: center;
     }
 
-    .card h2 {
-      font-size: 16px;
-      font-weight: 600;
-      margin-bottom: 6px;
-    }
+    .card-login h2 { font-size: 16px; font-weight: 600; margin: 0 0 6px; }
 
-    .card .subtitle {
+    .card-login .subtitle {
       font-size: 13px;
       color: var(--muted);
-      margin-bottom: 26px;
-      line-height: 1.5;
+      margin: 0 0 24px;
+      line-height: 1.55;
     }
 
     .alert {
@@ -92,13 +80,12 @@
       border-radius: var(--radius);
       font-size: 13px;
       line-height: 1.5;
-      margin-bottom: 20px;
+      margin-bottom: 18px;
       display: none;
       text-align: left;
     }
 
     .alert.show { display: block; }
-
     .alert-error   { background: var(--danger-soft);  color: var(--danger);  border: 1px solid var(--danger-border); }
     .alert-success { background: var(--success-soft); color: var(--success); border: 1px solid var(--success-border); }
 
@@ -109,21 +96,31 @@
       align-items: center;
     }
 
-    .spinner {
-      width: 20px; height: 20px;
-      border: 2px solid var(--border);
-      border-top-color: var(--accent);
-      border-radius: 50%;
-      animation: spin 0.7s linear infinite;
+    .features {
+      margin-top: 22px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
+      display: grid;
+      gap: 11px;
+      text-align: left;
     }
 
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .feature {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      font-size: 12.5px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+    }
+
+    .feature svg { color: var(--success); flex-shrink: 0; margin-top: 1px; }
 
     footer {
       text-align: center;
       font-size: 12px;
       color: var(--muted);
-      margin-top: 24px;
+      margin-top: 22px;
       line-height: 1.6;
     }
   </style>
@@ -132,30 +129,49 @@
 
 <div class="login-wrapper">
   <div class="brand">
+    <div class="brand-mark">
+      <svg width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>
+      </svg>
+    </div>
     <h1>Schedura</h1>
-    <div class="rule"></div>
-    <p>Automated conflict-free schedule planning</p>
+    <p>Conflict-free timetables for schools</p>
   </div>
 
-  <div class="card">
+  <div class="card-login">
     <h2>Sign in</h2>
-    <p class="subtitle">Use your Google account to access your projects.</p>
+    <p class="subtitle">Use your Google account. Your projects stay private to you.</p>
 
-    <div id="alertBox" class="alert"></div>
+    <div id="alertBox" class="alert" role="alert"></div>
 
-    <div id="googleBtnContainer"><div class="spinner"></div></div>
+    <div id="googleBtnContainer"><div class="spinner spinner-sm"></div></div>
+
+    <div class="features">
+      <div class="feature">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+        <span>Standards with any number of divisions, each pinned to its own classroom</span>
+      </div>
+      <div class="feature">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+        <span>Hard rules that must hold, soft preferences that get optimised</span>
+      </div>
+      <div class="feature">
+        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+        <span>Share a read-only week, or export to Excel, PDF and image</span>
+      </div>
+    </div>
   </div>
 
-  <footer>Your projects are private to your account.</footer>
+  <footer>Signing in creates your workspace. Nothing is shared with anyone else.</footer>
 </div>
 
+<script src="/ui.js"></script>
 <script>
-  const API_BASE_URL = '';  // relative — works on any host
-
-  // If already logged in, go straight to app
-  if (sessionStorage.getItem('auth_token')) {
-    window.location.href = '/dashboard.html';
-  }
+  const nextUrl = (() => {
+    const raw = new URLSearchParams(location.search).get('next');
+    // Only ever follow a same-site path, never an absolute URL from the query.
+    return raw && raw.startsWith('/') && !raw.startsWith('//') ? raw : '/projects';
+  })();
 
   function showAlert(message, type) {
     const box = document.getElementById('alertBox');
@@ -163,30 +179,31 @@
     box.className = `alert alert-${type} show`;
   }
 
-  function hideAlert() {
-    document.getElementById('alertBox').className = 'alert';
-  }
+  function hideAlert() { document.getElementById('alertBox').className = 'alert'; }
+
+  // Already have a live session? Skip the page entirely.
+  Schedura.auth.refresh().then(ok => { if (ok) location.replace(nextUrl); });
 
   async function handleGoogleCredential(response) {
     hideAlert();
     try {
-      const res  = await fetch(`${API_BASE_URL}/api/auth/google`, {
+      const res = await fetch('/api/auth/google', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ credential: response.credential })
       });
       const data = await res.json();
 
       if (res.ok && data.success) {
-        sessionStorage.setItem('auth_token', data.token);
-        sessionStorage.setItem('auth_email', data.email);
-        showAlert('Signed in. Redirecting…', 'success');
-        setTimeout(() => { window.location.href = 'dashboard.html'; }, 500);
+        Schedura.auth.adopt(data);
+        showAlert('Signed in. Taking you in…', 'success');
+        location.href = nextUrl;
       } else {
         showAlert(data.error || 'Google sign-in failed.', 'error');
       }
-    } catch (err) {
-      showAlert('Cannot reach the server. Make sure the backend is running.', 'error');
+    } catch {
+      showAlert('Cannot reach the server. Please try again in a moment.', 'error');
     }
   }
 
@@ -196,13 +213,9 @@
     return new Promise((resolve, reject) => {
       const start = Date.now();
       (function check() {
-        if (window.google && window.google.accounts && window.google.accounts.id) {
-          resolve();
-        } else if (Date.now() - start > timeoutMs) {
-          reject(new Error('Google Sign-In script failed to load in time.'));
-        } else {
-          setTimeout(check, 100);
-        }
+        if (window.google && window.google.accounts && window.google.accounts.id) resolve();
+        else if (Date.now() - start > timeoutMs) reject(new Error('Google Sign-In script failed to load in time.'));
+        else setTimeout(check, 100);
       })();
     });
   }
@@ -210,8 +223,7 @@
   async function initGoogleSignIn() {
     const container = document.getElementById('googleBtnContainer');
     try {
-      const res  = await fetch(`${API_BASE_URL}/api/config`);
-      const data = await res.json();
+      const data = await fetch('/api/config').then(r => r.json());
 
       if (!data.googleClientId) {
         container.innerHTML = '';
@@ -227,22 +239,15 @@
         return;
       }
 
-      google.accounts.id.initialize({
-        client_id: data.googleClientId,
-        callback: handleGoogleCredential
-      });
+      google.accounts.id.initialize({ client_id: data.googleClientId, callback: handleGoogleCredential });
 
       container.innerHTML = '';
       google.accounts.id.renderButton(container, {
-        theme: 'outline',
-        size: 'large',
-        width: 300,
-        text: 'signin_with',
-        shape: 'rectangular'
+        theme: 'outline', size: 'large', width: 300, text: 'signin_with', shape: 'rectangular'
       });
-    } catch (err) {
+    } catch {
       container.innerHTML = '';
-      showAlert('Cannot reach the server. Make sure the backend is running.', 'error');
+      showAlert('Cannot reach the server. Please try again in a moment.', 'error');
     }
   }
 

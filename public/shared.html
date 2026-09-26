@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Timetable · Schedura</title>
+  <meta name="description" content="A published class timetable." />
+  <meta name="robots" content="noindex" />
+  <meta name="theme-color" content="#FFFFFF" />
+
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Schedura" />
+  <meta property="og:title" content="Class timetable" />
+  <meta property="og:description" content="A published, read-only class timetable." />
+
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@500;600&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/app.css" />
+
+  <style>
+    .main {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 28px 24px 64px;
+    }
+
+    .doc-head {
+      margin-bottom: 22px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .doc-head h1 {
+      font-family: 'IBM Plex Serif', Georgia, serif;
+      font-size: 26px;
+      font-weight: 600;
+      margin: 0 0 8px;
+    }
+
+    .doc-meta {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      font-size: 12.5px;
+      color: var(--muted);
+    }
+
+    /* Pick which week to look at: one division, or one teacher. */
+    .view-controls {
+      display: flex;
+      gap: 12px;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      margin-bottom: 18px;
+    }
+
+    .view-controls > div { flex: 1 1 200px; min-width: 0; }
+
+    .tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--surface-sunken);
+      border-radius: var(--radius);
+      padding: 3px;
+    }
+
+    .tabs button {
+      flex: 1;
+      background: transparent;
+      border: none;
+      padding: 7px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--muted);
+      border-radius: 4px;
+      cursor: pointer;
+      font-family: inherit;
+      white-space: nowrap;
+    }
+
+    .tabs button[aria-selected="true"] {
+      background: var(--surface);
+      color: var(--text);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .sheet {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 18px;
+    }
+
+    .sheet h2 {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 0 0 3px;
+    }
+
+    .sheet p.sub {
+      font-size: 12.5px;
+      color: var(--muted);
+      margin: 0 0 14px;
+    }
+
+    .cell-course { font-weight: 600; }
+
+    .cell-sub {
+      display: block;
+      font-size: 11px;
+      color: var(--muted);
+      font-weight: 400;
+      margin-top: 2px;
+    }
+
+    .cell-free { color: var(--faint); }
+
+    td.has-class { background: var(--accent-soft) !important; }
+
+    footer {
+      text-align: center;
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 32px;
+      line-height: 1.7;
+    }
+
+    footer a { font-weight: 500; }
+
+    @media print {
+      .topbar, .view-controls, footer { display: none !important; }
+      body { background: #fff; }
+      .sheet { border: none; padding: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <a class="topbar-brand" href="/login">Schedura</a>
+  <span class="topbar-sep">/</span>
+  <div class="topbar-context">
+    <span class="topbar-title">Published timetable</span>
+  </div>
+  <div class="topbar-right">
+    <button class="btn btn-sm" id="printBtn">Print</button>
+  </div>
+</header>
+
+<main class="main" id="main">
+  <div class="skeleton skeleton-line" style="width:240px;height:22px;margin-bottom:20px"></div>
+  <div class="skeleton skeleton-card" style="height:300px"></div>
+</main>
+
+<script src="/ui.js"></script>
+<script>
+const { escHtml } = Schedura;
+
+const SHARE_ID = decodeURIComponent(location.pathname.split('/').filter(Boolean)[1] || '');
+
+let payload   = null;
+let viewMode  = 'division';   // 'division' | 'teacher'
+let days      = [];
+let slots     = [];
+
+document.getElementById('printBtn').onclick = () => window.print();
+
+/* ── Load ────────────────────────────────────────────────────────────────── */
+
+(async function load() {
+  const main = document.getElementById('main');
+
+  let data;
+  try {
+    data = await fetch(`/api/shared/${encodeURIComponent(SHARE_ID)}`).then(r => r.json());
+  } catch {
+    data = { success: false, error: 'Could not reach the server.' };
+  }
+
+  if (!data.success || !data.schedule) {
+    main.innerHTML = `
+      <div class="empty" style="margin-top:36px">
+        <svg width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4.5M12 16h.01"/></svg>
+        <h3>Link not available</h3>
+        <p>${escHtml(data.error || 'This timetable is no longer published.')}</p>
+      </div>`;
+    return;
+  }
+
+  payload = data;
+  document.title = `${data.name} · Timetable`;
+
+  // Days in their natural order, periods sorted by start time.
+  days = Object.keys(data.schedule).filter(d => Array.isArray(data.schedule[d]));
+
+  const seen = new Map();
+  days.forEach(d => data.schedule[d].forEach(c => {
+    const key = `${c.startTime}-${c.endTime}`;
+    if (!seen.has(key)) seen.set(key, { startTime: c.startTime, endTime: c.endTime });
+  }));
+  slots = [...seen.values()].sort((a, b) => String(a.startTime).localeCompare(String(b.startTime)));
+
+  render();
+})();
+
+/* ── Render ──────────────────────────────────────────────────────────────── */
+
+function allClasses() {
+  return days.flatMap(d => payload.schedule[d].map(c => ({ ...c, day: d })));
+}
+
+function divisionNames() {
+  return [...new Set(allClasses().map(c => c.divisionLabel || c.standard).filter(Boolean))].sort();
+}
+
+function teacherNames() {
+  return [...new Set(allClasses().map(c => c.faculty).filter(Boolean))].sort();
+}
+
+function render() {
+  const divisions = divisionNames();
+  const teachers  = teacherNames();
+  const options   = viewMode === 'division' ? divisions : teachers;
+
+  document.getElementById('main').innerHTML = `
+    <div class="doc-head">
+      <h1>${escHtml(payload.name)}</h1>
+      <div class="doc-meta">
+        <span class="badge badge-done">${payload.stats ? escHtml(String(payload.stats.classCount)) + ' classes' : 'Published'}</span>
+        ${payload.generatedAt ? `<span>Generated ${escHtml(Schedura.relTime(payload.generatedAt))}</span>` : ''}
+        <span>·</span>
+        <span>${divisions.length} divisions · ${teachers.length} teachers</span>
+      </div>
+    </div>
+
+    <div class="view-controls">
+      <div style="flex:0 0 auto">
+        <label>View</label>
+        <div class="tabs" role="tablist">
+          <button role="tab" aria-selected="${viewMode === 'division'}" data-mode="division">By division</button>
+          <button role="tab" aria-selected="${viewMode === 'teacher'}" data-mode="teacher">By teacher</button>
+        </div>
+      </div>
+      <div>
+        <label for="pick">${viewMode === 'division' ? 'Division' : 'Teacher'}</label>
+        <select id="pick">${options.map(o => `<option value="${escHtml(o)}">${escHtml(o)}</option>`).join('')}</select>
+      </div>
+    </div>
+
+    <div class="sheet" id="sheet"></div>
+
+    <footer>
+      This is a read-only timetable shared from Schedura.<br>
+      <a href="/login">Build your own</a>
+    </footer>`;
+
+  document.querySelectorAll('[data-mode]').forEach(b => {
+    b.onclick = () => { viewMode = b.dataset.mode; render(); };
+  });
+  document.getElementById('pick').onchange = renderSheet;
+
+  renderSheet();
+}
+
+function renderSheet() {
+  const who   = document.getElementById('pick').value;
+  const sheet = document.getElementById('sheet');
+
+  if (!who) {
+    sheet.innerHTML = '<p class="cell-free" style="margin:0;font-size:13px">Nothing to show.</p>';
+    return;
+  }
+
+  const mine = allClasses().filter(c =>
+    viewMode === 'division' ? (c.divisionLabel || c.standard) === who : c.faculty === who);
+
+  const room = viewMode === 'division' ? (mine.find(c => c.classroom) || {}).classroom : '';
+
+  const rows = slots.map(slot => {
+    const cells = days.map(day => {
+      const cls = mine.find(c => c.day === day && c.startTime === slot.startTime);
+      if (!cls) return '<td class="cell-free">—</td>';
+      const sub = viewMode === 'division'
+        ? (cls.faculty || '')
+        : `${cls.divisionLabel || cls.standard}${cls.classroom ? ' · ' + cls.classroom : ''}`;
+      return `<td class="has-class">
+          <span class="cell-course">${escHtml(cls.course || cls.courseCode || '')}</span>
+          ${sub ? `<span class="cell-sub">${escHtml(sub)}</span>` : ''}
+        </td>`;
+    }).join('');
+
+    return `<tr>
+        <td style="text-align:left;font-weight:600;white-space:nowrap">
+          ${escHtml(slot.startTime)}<span class="cell-sub">to ${escHtml(slot.endTime)}</span>
+        </td>${cells}
+      </tr>`;
+  }).join('');
+
+  sheet.innerHTML = `
+    <h2>${escHtml(who)}</h2>
+    <p class="sub">${mine.length} class${mine.length === 1 ? '' : 'es'} a week${room ? ` · ${escHtml(room)}` : ''}</p>
+    <div class="table-wrapper">
+      <table>
+        <thead><tr><th style="text-align:left">Period</th>${days.map(d => `<th>${escHtml(d)}</th>`).join('')}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+</script>
+</body>
+</html>
